@@ -179,12 +179,14 @@ describe('evaluateMapping', () => {
 });
 
 describe('presets', () => {
-  it('ships four built-in presets that all validate', () => {
+  it('ships the built-in presets and they all validate', () => {
     expect(BUILT_IN_PRESETS.map((p) => p.name)).toEqual([
       'Classic Two-Hand',
       'One-Hand Chords + Melody',
       'Theremin Pro',
       'DJ/FX',
+      'Arp & Groove',
+      'Strummer',
     ]);
     for (const p of BUILT_IN_PRESETS) {
       const r = validatePreset(JSON.parse(JSON.stringify(p)));

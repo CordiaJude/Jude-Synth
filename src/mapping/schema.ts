@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { PARAM_PATHS } from '../events/types';
 import { POSE_IDS } from '../gestures/types';
 import { BORROWED_CHORDS, CHORD_QUALITIES } from '../theory/chords';
+import { BASS_PATTERNS } from '../performance/bass';
+import { GENRES } from '../performance/drums/patterns';
 import { FINGER_NAMES, HAND_FEATURES, type MappingPreset } from './types';
 
 const role = z.enum(['primary', 'secondary']);
@@ -56,6 +58,16 @@ const action = z.discriminatedUnion('type', [
   z.object({ type: z.literal('melody.octave'), delta: z.union([z.literal(-1), z.literal(1)]) }),
   z.object({ type: z.literal('mode.set'), mode }),
   z.object({ type: z.literal('latch.toggle') }),
+  z.object({ type: z.literal('arp.toggle') }),
+  z.object({ type: z.literal('strum.toggle') }),
+  z.object({ type: z.literal('strum.strum'), direction: z.enum(['down', 'up']) }),
+  z.object({ type: z.literal('drums.toggle') }),
+  z.object({ type: z.literal('drums.fill') }),
+  z.object({ type: z.literal('drums.drop') }),
+  z.object({ type: z.literal('drums.nextGenre') }),
+  z.object({ type: z.literal('bass.nextPattern') }),
+  z.object({ type: z.literal('tempo.tap') }),
+  z.object({ type: z.literal('tempo.nudge'), delta: z.number().min(-40).max(40) }),
 ]);
 const trigger = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('pose'), role, pose }),
@@ -109,12 +121,24 @@ export const presetSchema = z.object({
     high: z.number().min(24).max(108),
     snap: z.number().min(0).max(1),
   }),
+  groove: z
+    .object({
+      arp: z.boolean().optional(),
+      strum: z.boolean().optional(),
+      drums: z.boolean().optional(),
+      genre: z.enum(GENRES).optional(),
+      bassPattern: z.enum(BASS_PATTERNS).optional(),
+    })
+    .optional(),
   continuous: z.array(
     z.object({
       id: z.string(),
       label: z.string().optional(),
       source: featureSource,
-      target: z.union([z.enum(PARAM_PATHS), z.literal('melody.pitch')]),
+      target: z.union([
+        z.enum(PARAM_PATHS),
+        z.enum(['melody.pitch', 'arp.rate', 'arp.gate', 'strum.position']),
+      ]),
       inRange: range,
       outRange: range,
       curve,

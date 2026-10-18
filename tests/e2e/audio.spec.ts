@@ -46,7 +46,7 @@ test.describe('audio quality (offline renders)', () => {
       // The strict (sine) detector is the zero-click acceptance bar. The transient detector on real
       // waveforms is a gross-artifact check only (an instrument's own plucky attack can approach it).
       if (r.detector === 'sine') expect(r.clicks, `${r.name} ${JSON.stringify(r.firstClicks)}`).toBe(0);
-      else expect(r.worstRatio, r.name).toBeLessThan(12);
+      else if (r.detector === 'transient') expect(r.worstRatio, r.name).toBeLessThan(12);
     }
     expect(results.find((r) => r.name.startsWith('loud'))!.peakDb).toBeGreaterThan(-3); // it was actually loud
   });

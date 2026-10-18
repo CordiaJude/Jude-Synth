@@ -14,9 +14,13 @@ data ever leaves the browser (enforced by a `connect-src 'self'` Content-Securit
   Roman numerals, automatic voice leading, scale quantizer), a click-free polyphonic synth (Supersaw Pad,
   Warm Analog Poly, Sub Bass), an FX bus (chorus, tempo-synced ping-pong delay, procedural convolution
   reverb, tape saturation and lookahead limiter as AudioWorklets), and the **Classic Two-Hand** preset.
-- **Phase 3 — mapping & UX (this build):** a declarative gesture → music mapping layer with four presets
+- **Phase 3 — mapping & UX:** a declarative gesture → music mapping layer with four presets
   and a live editor, four more instruments (FM Keys, Pluck, Glass Bell, Theremin Lead with tremor vibrato),
   10-second calibration, keyboard and touch play (no camera needed), accessibility settings.
+- **Phase 4 — performance tools (this build):** tempo-synced arpeggiator, strum mode, auto-bass patterns,
+  a synthesized drum machine (lofi / house / trap / synthwave) with fills, drops and sidechain ducking,
+  a quantize engine (off · 1/8 · 1/16 · 1/16T, strength, humanize), predictive onset, and an end-to-end
+  latency breakdown in the debug panel.
 
 ## Run it locally
 
@@ -51,6 +55,8 @@ If Playwright's own Chromium isn't installed, point it at any Chromium:
 | **One-Hand Chords + Melody** | chords; height = pad level | pinch = play a note, height = pitch (scale-locked), swipe up/down = octave |
 | **Theremin Pro** | height = volume, distance = space | height = pitch (pulled 60% to the scale), tilt = tone, **hand tremor = vibrato** |
 | **DJ/FX** | chords; height = master volume | left/right = DJ filter (centre off), height = delay, tilt = feedback, distance = reverb, close hand = grit |
+| **Arp & Groove** | chords (arpeggiated over synthwave drums + octave bass) | height = arp rate, pinch = note length, fist = fill, swipe down = drop, swipe right/left = next style / bass pattern, tilt = brightness, distance = space |
+| **Strummer** | chords | sweep left/right across six virtual strings to strum (faster = louder), tilt = brightness |
 
 Open **Mappings** to see exactly what each gesture does, with live meters and curve previews. Change any
 source, target, range, curve, inversion or deadzone; press **Learn** and move to assign whatever you moved
@@ -68,9 +74,37 @@ Choose **Play with keyboard / touch** on the start page (or enable the touch pad
 | `↑` `↓` / `←` `→` | chord octave / inversion |
 | `Space` or `0` / `L` | release / latch |
 | `Z` … `/` | melody notes (scale degrees 1–10) |
+| `A` / `S` (Shift = up) | arpeggiator on/off / strum the chord |
+| `D` · `F` · `G` | drums on/off · fill · drop |
+| `H` · `J` | next drum style · next bass pattern |
+| `T` · `-` `=` | tap tempo · tempo −5 / +5 |
 
 The touch pad has the seven degree pads (labelled with Roman numeral and chord name), shapes, borrow,
 latch and release, plus a melody strip for the melody/theremin presets.
+
+## Groove: arp, strum, drums, bass, quantize
+
+Open **Groove** in the top bar. Tempo (with tap) and the bar.beat position are shown; picking a drum style
+sets its native tempo (lofi 82 with swing, house 124, trap 140, synthwave 110). The arpeggiator plays the
+current chord up / down / up-down / random / as-played over 1–3 octaves at 1/4 … 1/32; strum mode turns the
+chord into six strings across the frame. Auto-bass follows the chord root with sustain, pulse, root-fifth,
+octaves, offbeat or walking patterns. The drums duck the pad and bass (sidechain amount adjustable).
+
+Quantize delays chord and note onsets to the next 1/8, 1/16 or 1/16-triplet line (strength pulls part of the
+way; humanize adds a few ms of jitter; onsets already within 30 ms of a line play immediately). Parameter
+moves are never quantized.
+
+All patterns are pure functions of the transport and are scheduled 80 ms ahead on the audio clock, so a
+pattern is identical however the scheduler slices time (tested). Note: browsers throttle timers in
+background tabs, so keep the tab visible while playing.
+
+## Latency
+
+**Debug → Latency by stage** shows the median of each stage, from camera frame to sound: camera → worker,
+hand detection, gesture recognition, worker → main, main thread, scheduling lookahead, quantize wait and
+audio output. **Debug → Tuning → Predictive onset** fires a pose's chord as soon as the fingers are clearly
+heading there (from finger velocity) and corrects it within 150 ms if the prediction was wrong; the panel
+counts hits and reverts.
 
 ## Calibration and settings
 

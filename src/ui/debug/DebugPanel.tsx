@@ -111,6 +111,51 @@ function AudioSection() {
   );
 }
 
+function LatencyBreakdown() {
+  const stages = useMusic((s) => s.latencyStages);
+  const p50 = useMusic((s) => s.latencyP50);
+  const p95 = useMusic((s) => s.latencyP95);
+  const predictions = useMusic((s) => s.predictions);
+  const predictive = useApp((s) => s.tracking.gestures.predictiveOnset);
+  const max = Math.max(1, ...stages.map((x) => x.p50));
+  return (
+    <section className={styles.section}>
+      <h3>
+        Camera → sound
+        <span className={p50 && p50 < 60 ? styles.good : undefined}>
+          {p50 ? `${p50.toFixed(0)} ms (p95 ${p95.toFixed(0)})` : 'play something'}
+        </span>
+      </h3>
+      {stages.length > 0 && (
+        <ul className={styles.stages} aria-label="Latency by stage (median)">
+          {stages.map((x) => (
+            <li key={x.stage}>
+              <span>{x.stage}</span>
+              <div className={styles.bar}>
+                <div
+                  className={styles.barFill}
+                  style={{ width: `${(x.p50 / max) * 100}%`, background: 'var(--primary)' }}
+                />
+              </div>
+              <span className="tabular">{x.p50.toFixed(1)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className={styles.hint}>
+        Measured from the camera frame’s timestamp to when the browser says the sound reaches the speaker.
+        Time before the frame timestamp (sensor exposure, USB) can’t be measured from a web page.
+      </p>
+      <p className={styles.hint}>
+        Predictive onset {predictive ? 'on' : 'off'}
+        {predictive && predictions.announced > 0
+          ? ` — ${predictions.announced} early triggers, ${Math.round((1 - predictions.reverted / predictions.announced) * 100)}% confirmed`
+          : ''}
+      </p>
+    </section>
+  );
+}
+
 function HandDetail({ hand }: { hand: HandGesture }) {
   const { extendEnter, extendExit } = useApp((s) => s.tracking.gestures);
   const color = hand.role === 'primary' ? 'var(--primary)' : 'var(--secondary)';
@@ -319,6 +364,7 @@ export function DebugPanel() {
   return (
     <aside className={styles.panel} aria-label="Debug panel">
       <Pipeline />
+      <LatencyBreakdown />
       <AudioSection />
       <Hands />
       <Events />

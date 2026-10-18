@@ -78,7 +78,19 @@ export interface HandGesture {
 export type SwipeDirection = 'left' | 'right' | 'up' | 'down';
 
 export type GestureEvent =
-  | { type: 'poseEnter' | 'poseExit'; hand: HandId; role: HandRole; pose: PoseId; time: number }
+  | {
+      type: 'poseEnter' | 'poseExit';
+      hand: HandId;
+      role: HandRole;
+      pose: PoseId;
+      time: number;
+      /**
+       * Predictive onset: emitted before the pose is committed (or, with `revert`, to re-assert the committed
+       * pose when a prediction didn't come true).
+       */
+      tentative?: boolean;
+      revert?: boolean;
+    }
   | { type: 'pinchStart' | 'pinchEnd' | 'pinchTap'; hand: HandId; role: HandRole; time: number }
   | { type: 'fistClench'; hand: HandId; role: HandRole; time: number; strength: number }
   | { type: 'swipe'; hand: HandId; role: HandRole; time: number; direction: SwipeDirection; speed: number }

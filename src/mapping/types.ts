@@ -4,6 +4,9 @@ import type { InstrumentId } from '../audio/instruments/types';
 import type { GestureEventType, PoseId, SwipeDirection } from '../gestures/types';
 import type { ParamPath } from '../events/types';
 import type { BorrowedChord, ChordQuality, Degree, Extension } from '../theory/chords';
+import type { BassPattern } from '../performance/bass';
+import type { Genre } from '../performance/drums/patterns';
+import type { GrooveAction, GrooveTarget } from '../performance/groove';
 import type { HandRole } from '../vision/types';
 
 export type Curve =
@@ -44,7 +47,7 @@ export type FeatureSource =
   | 'twoHand.angle';
 
 /** Continuous destinations: engine params plus performance-level controls. */
-export type MappingTarget = ParamPath | 'melody.pitch';
+export type MappingTarget = ParamPath | 'melody.pitch' | GrooveTarget;
 
 export type PerformanceMode = 'chords' | 'melody' | 'theremin';
 
@@ -93,7 +96,8 @@ export type Action =
   | { type: 'melody.gate'; on: boolean }
   | { type: 'melody.octave'; delta: -1 | 1 }
   | { type: 'mode.set'; mode: PerformanceMode }
-  | { type: 'latch.toggle' };
+  | { type: 'latch.toggle' }
+  | GrooveAction;
 
 export interface DiscreteMapping {
   id: string;
@@ -116,6 +120,8 @@ export interface MappingPreset {
   instruments: { chords: InstrumentId; melody: InstrumentId; bass: boolean };
   /** Melody/theremin pitch range (MIDI) and how hard pitch snaps to the scale (0 = free, 1 = hard). */
   melody: { low: number; high: number; snap: number };
+  /** Groove features the preset switches on when selected (omitted = leave as they are). */
+  groove?: { arp?: boolean; strum?: boolean; drums?: boolean; genre?: Genre; bassPattern?: BassPattern };
   continuous: ContinuousMapping[];
   discrete: DiscreteMapping[];
 }

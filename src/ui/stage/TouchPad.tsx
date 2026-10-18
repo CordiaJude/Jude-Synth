@@ -1,7 +1,7 @@
 // Touch / mouse fallback: degree pads, chord shapes, and a melody strip. Same Actions as the hands.
 
 import { useRef, useState } from 'react';
-import { conductorSnapshot, perform, useMusic } from '../../state/music';
+import { conductorSnapshot, perform, useGroove, useMusic } from '../../state/music';
 import { diatonicChords, type Degree, type Extension } from '../../theory/chords';
 import type { ChordQuality } from '../../theory/chords';
 import styles from './TouchPad.module.css';
@@ -21,6 +21,7 @@ export function TouchPad() {
   const [stripY, setStripY] = useState<number | null>(null);
   const chords = diatonicChords({ tonic, mode });
   const current = conductorSnapshot().degree;
+  const groove = useGroove();
 
   const play = (degree: Degree) =>
     perform(
@@ -95,6 +96,42 @@ export function TouchPad() {
             </button>
             <button className={styles.small} onClick={() => perform([{ type: 'chord.release' }], [])}>
               Release
+            </button>
+          </div>
+          <div className={styles.row} role="group" aria-label="Groove">
+            <button
+              className={styles.small}
+              aria-pressed={groove.arp.enabled}
+              onClick={() => perform([{ type: 'arp.toggle' }], [])}
+            >
+              Arp
+            </button>
+            <button
+              className={styles.small}
+              onClick={() => perform([{ type: 'strum.strum', direction: 'down' }], [])}
+            >
+              Strum ↓
+            </button>
+            <button
+              className={styles.small}
+              aria-pressed={groove.drums}
+              onClick={() => perform([{ type: 'drums.toggle' }], [])}
+            >
+              Drums
+            </button>
+            <button
+              className={styles.small}
+              onClick={() => perform([{ type: 'drums.fill' }], [])}
+              disabled={!groove.drums}
+            >
+              Fill
+            </button>
+            <button
+              className={styles.small}
+              onClick={() => perform([{ type: 'drums.nextGenre' }], [])}
+              disabled={!groove.drums}
+            >
+              Style
             </button>
           </div>
         </div>

@@ -8,6 +8,7 @@
 
 import * as Tone from 'tone';
 import type { InstrumentSlot, MusicEvent, ParamPath } from '../events/types';
+import { DrumKit } from './drums';
 import { Ducker } from './fx/ducker';
 import { Reverb } from './fx/reverb';
 import { PATCHES } from './instruments/patches';
@@ -47,6 +48,8 @@ export class AudioEngine {
   readonly ctx: Tone.BaseContext;
   readonly analyser: AnalyserNode;
   readonly ducker: Ducker;
+  private drums: DrumKit;
+  private drumsGain: GainNode;
   private slots: Partial<Record<InstrumentSlot, Slot>> = {};
   private slotInputs: Record<SlotName, AudioNode>;
   private djLow: BiquadFilterNode;
@@ -110,6 +113,10 @@ export class AudioEngine {
     }
     bassIn.connect(preFx);
     melodyIn.connect(preFx);
+    // Drums go through tape (glue) but skip the chorus; they are not ducked by their own kick.
+    this.drums = new DrumKit(ctx);
+    this.drumsGain = ctx.createGain();
+    this.drums.output.connect(this.drumsGain);
     this.slotInputs = { chords: chordsIn, bass: bassIn, melody: melodyIn };
 
     const afterTape: AudioNode = this.tape ?? preFx;
@@ -143,6 +150,22 @@ export class AudioEngine {
     this.djHigh.Q.value = 0.9;
     this.djHigh.frequency.value = DJ_OPEN_HP;
     sum.connect(this.djLow);
+    // Drums join after the ducker so the kick ducks everything else, not itself.
+    const drumsPost = ctx.createGain();
+    this.drumsGain.connect(drumsPost);
+    if (this.tape) {
+      const drumTape = ctx.createAudioWorkletNode('handwave-tape', { outputChannelCount: [2] });
+      drumsPost.connect(drumTape);
+      drumTape.connect(this.master);
+    } else {
+      drumsPost.connect(this.master);
+    }
+    if (this.reverb) {
+      const drumVerb = ctx.createGain();
+      drumVerb.gain.value = 0.12;
+      this.drumsGain.connect(drumVerb);
+      drumVerb.connect(this.reverb.input);
+    }
     this.djLow.connect(this.djHigh);
     this.djHigh.connect(this.ducker.node);
     this.ducker.node.connect(this.master);
@@ -226,7 +249,7 @@ export class AudioEngine {
     switch (e.kind) {
       case 'chord': {
         const m = this.manager(e.slot);
-        if (!m) return;
+        if (!m || e.play === false) return;
         m.setChord(e.chord ? e.voicing : [], e.time, { transition: e.transition, velocity: e.velocity });
         break;
       }
@@ -238,6 +261,13 @@ export class AudioEngine {
         break;
       case 'pitch':
         this.manager(e.slot)?.pitchNote(e.id, e.note, e.time, e.glide);
+        break;
+      case 'slotRelease':
+        this.manager(e.slot)?.releaseAll(e.time);
+        break;
+      case 'drum':
+        this.drums.trigger(e.voice, e.velocity, e.time);
+        if (e.voice === 'kick') this.ducker.trigger(e.time, e.velocity);
         break;
       case 'param':
         this.setParam(e.target, e.value, e.time, e.rampMs / 1000);
@@ -292,6 +322,12 @@ export class AudioEngine {
         break;
       case 'chords.level':
         if (this.slots.chords) glideTo(this.slots.chords.gain.gain, v, time, tau);
+        break;
+      case 'fx.duck':
+        this.ducker.amount = v;
+        break;
+      case 'drums.level':
+        glideTo(this.drumsGain.gain, v, time, tau);
         break;
       case 'melody.level':
         if (this.slots.melody) glideTo(this.slots.melody.gain.gain, v, time, tau);

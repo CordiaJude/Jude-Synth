@@ -5,6 +5,8 @@
 //   ↑ / ↓      chord octave up / down          ← / →   inversion down / up
 //   Space · 0  release the chord               L       latch (hold chords)
 //   Z X C V B N M , . /   melody: scale degrees 1–10 (held = sounding)
+//   A arp · S strum (Shift: up) · D drums · F fill · G drop · H next drum style · J next bass pattern
+//   T tap tempo · − / = tempo down / up
 
 import type { Action, ParamUpdate } from '../mapping/types';
 import { scaleOf, type Key } from '../theory/modes';
@@ -126,6 +128,34 @@ export function handleKey(e: KeyInput, ctx: KeyboardContext, held: Set<string>):
     case 'KeyL':
       out.actions.push({ type: 'latch.toggle' });
       return out;
+    case 'KeyA':
+      out.actions.push({ type: 'arp.toggle' });
+      return out;
+    case 'KeyS':
+      out.actions.push({ type: 'strum.strum', direction: e.shiftKey ? 'up' : 'down' });
+      return out;
+    case 'KeyD':
+      out.actions.push({ type: 'drums.toggle' });
+      return out;
+    case 'KeyF':
+      out.actions.push({ type: 'drums.fill' });
+      return out;
+    case 'KeyG':
+      out.actions.push({ type: 'drums.drop' });
+      return out;
+    case 'KeyH':
+      out.actions.push({ type: 'drums.nextGenre' });
+      return out;
+    case 'KeyJ':
+      out.actions.push({ type: 'bass.nextPattern' });
+      return out;
+    case 'KeyT':
+      out.actions.push({ type: 'tempo.tap' });
+      return out;
+    case 'Minus':
+    case 'Equal':
+      out.actions.push({ type: 'tempo.nudge', delta: e.code === 'Equal' ? 5 : -5 });
+      return out;
     default:
       return null;
   }
@@ -140,4 +170,9 @@ export const KEYBOARD_HELP: Array<[string, string]> = [
   ['Space / 0', 'Release chord'],
   ['L', 'Latch (hold chords)'],
   ['Z … /', 'Melody notes (scale degrees 1 – 10)'],
+  ['A', 'Arpeggiator on / off'],
+  ['S (Shift + S)', 'Strum down (up)'],
+  ['D · F · G', 'Drums on / off · fill · drop'],
+  ['H · J', 'Next drum style · next bass pattern'],
+  ['T · − =', 'Tap tempo · tempo down / up'],
 ];

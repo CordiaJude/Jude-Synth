@@ -65,6 +65,9 @@ interface HandState {
   poseSince: number;
   candidate: PoseId | null;
   candidateSince: number;
+  /** Pose announced early by predictive onset and not yet confirmed. */
+  tentative: PoseId | null;
+  tentativeSince: number;
   pinch: PinchDetector;
   swipe: SwipeDetector;
   snap: SnapDetector;
@@ -101,6 +104,8 @@ function newHandState(h: TrackedHand, t: number): HandState {
     poseSince: t,
     candidate: null,
     candidateSince: t,
+    tentative: null,
+    tentativeSince: t,
     pinch: { pinching: false, since: t },
     swipe: { armed: false, peak: 0, peakVx: 0, peakVy: 0, cooldownUntil: t + 150 },
     snap: { lastPrimedAt: -Infinity, cooldownUntil: t + 150 },
@@ -286,25 +291,38 @@ function recognizeHand(
     }
   }
 
-  // Predictive onset: extrapolate extensions one frame ahead; if that confidently lands on a different
-  // pose, report it early as tentative. Downstream may schedule it and cancel if not confirmed.
-  if (cfg.predictiveOnset && s.candidate === null) {
+  // Predictive onset: extrapolate finger extensions one frame ahead. If that (or a pose already leading
+  // the debounce) confidently lands on a new pose, announce it now as a tentative poseEnter — about one
+  // frame earlier than the committed one. If it doesn't come true within ~150 ms, re-assert the committed
+  // pose (a tentative poseEnter with `revert`) so downstream can undo it.
+  if (cfg.predictiveOnset) {
     const ahead = new Float64Array(5);
     const flags: boolean[] = [];
     for (let i = 0; i < 5; i++) {
       ahead[i] = clamp01(s.ext[i]! + s.extVel[i]! * dt);
       flags.push(s.extended[i]!);
     }
-    const pAhead = extendedProbabilities(ahead, flags, cfg.extendEnter, cfg.extendExit);
-    const predicted = scorePoses(pAhead, pinchCloseness)[0]!;
-    if (predicted.pose !== s.pose && predicted.score > cfg.minPoseConfidence + 0.15) {
-      poseResult = {
-        ...poseResult,
-        pose: predicted.pose,
-        confidence: predicted.score * 0.8,
-        tentative: true,
-      };
+    const predicted = scorePoses(
+      extendedProbabilities(ahead, flags, cfg.extendEnter, cfg.extendExit),
+      pinchCloseness,
+    )[0]!;
+    const strong = predicted.score > cfg.minPoseConfidence + 0.15 && predicted.pose !== 'none';
+    const target = s.candidate && s.candidate !== 'none' ? s.candidate : strong ? predicted.pose : null;
+    if (s.tentative !== null) {
+      if (s.pose === s.tentative) {
+        s.tentative = null; // confirmed
+      } else if (target !== s.tentative || t - s.tentativeSince > 150) {
+        emit({ type: 'poseEnter', pose: s.pose, tentative: true, revert: true });
+        s.tentative = null;
+      }
     }
+    if (s.tentative === null && target && target !== s.pose && prevPose === s.pose) {
+      s.tentative = target;
+      s.tentativeSince = t;
+      emit({ type: 'poseEnter', pose: target, tentative: true });
+    }
+    if (s.tentative)
+      poseResult = { ...poseResult, pose: s.tentative, confidence: predicted.score * 0.8, tentative: true };
   }
 
   // Discrete events.

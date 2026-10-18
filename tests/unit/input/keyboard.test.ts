@@ -68,6 +68,26 @@ describe('keyboard fallback', () => {
     expect(60 + pitchForScaleIndex(dorian, { low: 60, high: 84 }, 1) * 24).toBe(62);
   });
 
+  it('groove keys map to groove actions', () => {
+    const acts = ['KeyA', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyT', 'Equal'].map(
+      (c) => handleKey(down(c), ctx, new Set())!.actions[0]!.type,
+    );
+    expect(acts).toEqual([
+      'arp.toggle',
+      'drums.toggle',
+      'drums.fill',
+      'drums.drop',
+      'drums.nextGenre',
+      'bass.nextPattern',
+      'tempo.tap',
+      'tempo.nudge',
+    ]);
+    expect(handleKey(down('KeyS', true), ctx, new Set())!.actions[0]).toEqual({
+      type: 'strum.strum',
+      direction: 'up',
+    });
+  });
+
   it('octave and inversion keys are bounded', () => {
     let c = ctx;
     for (let i = 0; i < 4; i++) c = handleKey(down('ArrowUp'), c, new Set())!.context;

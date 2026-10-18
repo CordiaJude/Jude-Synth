@@ -1,6 +1,7 @@
-// Music controller: gesture frames → mapping preset → conductor → event bus → audio engine. Keyboard and
-// touch input enter at the conductor with the same Actions. Lives outside React; the UI reads a small
-// zustand store that only changes when something musical changes.
+// Music controller: gesture frames → mapping preset → conductor + groove → event bus → audio engine.
+// Keyboard and touch input enter with the same Actions. Time-based parts (arp, drums, patterned bass) come
+// from a lookahead scheduler on the audio clock. Lives outside React; the UI reads small zustand stores that
+// only change when something musical changes.
 
 import * as Tone from 'tone';
 import { create } from 'zustand';
@@ -11,6 +12,8 @@ import { EventBus } from '../events/bus';
 import type { EventCause, MusicEvent } from '../events/types';
 import { createMappingState, evaluateMapping, type MappingState } from '../mapping/evaluate';
 import type { Action, MappingPreset, ParamUpdate, PerformanceMode } from '../mapping/types';
+import type { ArpSettings } from '../performance/arp';
+import type { BassPattern } from '../performance/bass';
 import {
   conduct,
   DEFAULT_CONDUCTOR,
@@ -18,12 +21,37 @@ import {
   type ConductorSettings,
   type ConductorState,
 } from '../performance/conductor';
+import type { Genre } from '../performance/drums/patterns';
+import {
+  grooveAction,
+  grooveHarmony,
+  grooveParam,
+  grooveWindow,
+  GROOVE_ACTION_TYPES,
+  GROOVE_TARGETS,
+  initialGroove,
+  padPlays,
+  setBassPattern,
+  setGenre,
+  type GrooveAction,
+  type GrooveState,
+  type GrooveTarget,
+} from '../performance/groove';
+import { LATENCY_STAGES, latencyStages, type LatencyStage } from '../performance/latency';
+import { quantizeTime, setTempo, type QuantizeSettings } from '../performance/transport';
 import type { Mode } from '../theory/modes';
 import { noteName, type PitchClass } from '../theory/notes';
+import { wallNow } from '../vision/types';
 import { live, percentile } from './live';
 import { activePreset, usePresets } from './presets';
 
 export type AudioStatus = 'off' | 'starting' | 'on' | 'error';
+
+export interface StageStat {
+  stage: LatencyStage;
+  p50: number;
+  p95: number;
+}
 
 interface MusicState {
   status: AudioStatus;
@@ -41,6 +69,9 @@ interface MusicState {
   /** Camera capture → sound at the speaker, ms. */
   latencyP50: number;
   latencyP95: number;
+  latencyStages: StageStat[];
+  /** Predictive onset: announced early / taken back. */
+  predictions: { announced: number; reverted: number };
   setKey: (tonic: PitchClass, mode: Mode) => void;
   setChordInstrument: (id: InstrumentId) => void;
   setMelodyInstrument: (id: InstrumentId) => void;
@@ -48,13 +79,37 @@ interface MusicState {
   setMuted: (muted: boolean) => void;
 }
 
+/** Groove settings mirrored for the UI. */
+interface GrooveUi {
+  bpm: number;
+  arp: ArpSettings;
+  strum: boolean;
+  drums: boolean;
+  genre: Genre;
+  duck: number;
+  bassPattern: BassPattern;
+  quantize: QuantizeSettings;
+  /** Current bar.beat, refreshed by the scheduler while anything rhythmic plays. */
+  position: string;
+}
+
 export const bus = new EventBus();
 let engine: AudioEngine | null = null;
 let conductor: ConductorState = initialConductorState();
 let mapping: MappingState = createMappingState();
 let preset: MappingPreset = activePreset();
+let groove: GrooveState = initialGroove();
 let unsubscribeLive: (() => void) | null = null;
+let scheduler: ReturnType<typeof setInterval> | null = null;
+let scheduledUntil = 0;
 const latencies: number[] = [];
+const stageSamples: Record<LatencyStage, number[]> = Object.fromEntries(
+  LATENCY_STAGES.map((s) => [s, []]),
+) as never;
+
+/** Scheduler cadence and horizon: short enough that live changes are heard quickly. */
+const TICK_MS = 15;
+const HORIZON = 0.08;
 
 export const useMusic = create<MusicState>()((set, get) => ({
   status: 'off',
@@ -71,6 +126,8 @@ export const useMusic = create<MusicState>()((set, get) => ({
   melodyNote: null,
   latencyP50: 0,
   latencyP95: 0,
+  latencyStages: [],
+  predictions: { announced: 0, reverted: 0 },
   setKey: (tonic, mode) => {
     set({ tonic, mode });
     // Re-voice the held chord in the new key right away.
@@ -94,9 +151,38 @@ export const useMusic = create<MusicState>()((set, get) => ({
     const t = engine.now();
     engine.setParam('chords.level', muted ? 0 : 1, t, 0.15);
     engine.setParam('melody.level', muted ? 0 : 1, t, 0.15);
+    engine.setParam('drums.level', muted ? 0 : 1, t, 0.15);
     engine.setParam('bass.level', muted || !get().bass ? 0 : 1, t, 0.15);
   },
 }));
+
+const grooveUi = (): GrooveUi => ({
+  bpm: groove.transport.bpm,
+  arp: groove.arp,
+  strum: groove.strum.enabled,
+  drums: groove.drums.enabled,
+  genre: groove.drums.genre,
+  duck: useGroove.getState().duck,
+  bassPattern: groove.bassPattern,
+  quantize: groove.quantize,
+  position: useGroove.getState().position,
+});
+
+export const useGroove = create<GrooveUi>()(() => ({
+  bpm: groove.transport.bpm,
+  arp: groove.arp,
+  strum: false,
+  drums: false,
+  genre: groove.drums.genre,
+  duck: 0.35,
+  bassPattern: groove.bassPattern,
+  quantize: groove.quantize,
+  position: '1.1',
+}));
+
+function syncGrooveUi() {
+  useGroove.setState(grooveUi());
+}
 
 export function getEngine(): AudioEngine | null {
   return engine;
@@ -118,10 +204,8 @@ function onMusicEvent(e: MusicEvent) {
     useMusic.setState({
       chord: e.chord ? { name: e.chord.name, roman: e.chord.roman, notes: e.voicing } : null,
     });
-    if (e.cause) recordLatency(e.time, e.cause);
   } else if (e.kind === 'noteOn' && e.slot === 'melody') {
     useMusic.setState({ melodyNote: noteName(Math.round(e.note), false) });
-    if (e.cause) recordLatency(e.time, e.cause);
   } else if (e.kind === 'pitch' && e.slot === 'melody') {
     useMusic.setState({ melodyNote: noteName(Math.round(e.note), false) });
   } else if (e.kind === 'noteOff' && e.slot === 'melody') {
@@ -129,11 +213,30 @@ function onMusicEvent(e: MusicEvent) {
   }
 }
 
-function recordLatency(time: number, cause: EventCause) {
+function recordLatency(cause: EventCause, scheduledAt: number, eventTime: number, unquantized: number) {
   if (!engine) return;
-  latencies.push(engine.heardAt(time) - cause.captureTime);
+  const { stages, total } = latencyStages({
+    cause,
+    scheduledAt,
+    lookaheadMs: LIVE_LOOKAHEAD * 1000,
+    quantizeMs: (eventTime - unquantized) * 1000,
+    heardAt: engine.heardAt(eventTime),
+  });
+  latencies.push(total);
   if (latencies.length > 60) latencies.shift();
-  useMusic.setState({ latencyP50: percentile(latencies, 0.5), latencyP95: percentile(latencies, 0.95) });
+  for (const s of LATENCY_STAGES) {
+    stageSamples[s].push(stages[s]);
+    if (stageSamples[s].length > 60) stageSamples[s].shift();
+  }
+  useMusic.setState({
+    latencyP50: percentile(latencies, 0.5),
+    latencyP95: percentile(latencies, 0.95),
+    latencyStages: LATENCY_STAGES.map((stage) => ({
+      stage,
+      p50: percentile(stageSamples[stage], 0.5),
+      p95: percentile(stageSamples[stage], 0.95),
+    })),
+  });
 }
 
 function syncConductorUi() {
@@ -143,17 +246,52 @@ function syncConductorUi() {
   }
 }
 
-/** Feed actions/params into the conductor (keyboard, touch, and gestures all come through here). */
+const QUANTIZED_KINDS = new Set(['chord', 'noteOn', 'noteOff']);
+
+/**
+ * Feed actions/params in (keyboard, touch, and gestures all come through here). Harmony/melody go to the
+ * conductor, rhythm controls to the groove; discrete musical events are quantized if the user asked for it.
+ */
 export function perform(
   actions: readonly Action[],
   params: readonly ParamUpdate[],
   cause?: EventCause,
 ): void {
   if (!engine) return;
-  const r = conduct(conductor, { actions, params, cause }, engine.now() + LIVE_LOOKAHEAD, settings());
+  const scheduledAt = wallNow();
+  const t0 = engine.now() + LIVE_LOOKAHEAD;
+  const grooveActions = actions.filter((a) => GROOVE_ACTION_TYPES.has(a.type)) as GrooveAction[];
+  const conductorActions = actions.filter((a) => !GROOVE_ACTION_TYPES.has(a.type));
+  const qt = conductorActions.length ? quantizeTime(t0, groove.transport, groove.quantize, t0) : t0;
+
+  const r = conduct(conductor, { actions: conductorActions, params, cause }, t0, settings());
   conductor = r.state;
-  bus.emitAll(r.events);
+  const out: MusicEvent[] = [];
+  let measured = false;
+  for (const raw of r.events) {
+    const e = QUANTIZED_KINDS.has(raw.kind) ? ({ ...raw, time: qt } as MusicEvent) : raw;
+    const h = grooveHarmony(groove, e);
+    groove = h.state;
+    out.push(h.event);
+    if (cause && !measured && (e.kind === 'chord' || e.kind === 'noteOn') && 'cause' in e && e.cause) {
+      recordLatency(cause, scheduledAt, qt, t0);
+      measured = true;
+    }
+  }
+  for (const a of grooveActions) {
+    const g = grooveAction(groove, a, t0);
+    groove = g.state;
+    out.push(...g.events);
+  }
+  for (const p of params) {
+    if (!GROOVE_TARGETS.has(p.target)) continue;
+    const g = grooveParam(groove, p.target as GrooveTarget, p.value, t0, cause?.captureTime ?? wallNow());
+    groove = g.state;
+    out.push(...g.events);
+  }
+  bus.emitAll(out);
   syncConductorUi();
+  if (grooveActions.length) syncGrooveUi();
 }
 
 /** Current harmonic context for the keyboard / touch inputs. */
@@ -161,25 +299,115 @@ export function conductorSnapshot(): Pick<ConductorState, 'octave' | 'inversionB
   return conductor;
 }
 
+// ---- groove settings from the UI --------------------------------------------------------------------------
+
+function updateGroove(fn: (g: GrooveState, time: number) => { state: GrooveState; events?: MusicEvent[] }) {
+  const t = (engine?.now() ?? 0) + LIVE_LOOKAHEAD;
+  const r = fn(groove, t);
+  groove = r.state;
+  if (r.events?.length) bus.emitAll(r.events);
+  syncGrooveUi();
+}
+
+export const grooveControls = {
+  setBpm: (bpm: number) =>
+    updateGroove((g, t) => ({ state: { ...g, transport: setTempo(g.transport, bpm, t) } })),
+  setArp: (patch: Partial<ArpSettings>) =>
+    updateGroove((g, t) => {
+      if (patch.enabled !== undefined && patch.enabled !== g.arp.enabled) {
+        const r = grooveAction(g, { type: 'arp.toggle' }, t);
+        return { state: { ...r.state, arp: { ...r.state.arp, ...patch } }, events: r.events };
+      }
+      return { state: { ...g, arp: { ...g.arp, ...patch } } };
+    }),
+  setStrum: (on: boolean) =>
+    updateGroove((g, t) =>
+      on !== g.strum.enabled ? grooveAction(g, { type: 'strum.toggle' }, t) : { state: g },
+    ),
+  setDrums: (on: boolean) =>
+    updateGroove((g, t) =>
+      on !== g.drums.enabled ? grooveAction(g, { type: 'drums.toggle' }, t) : { state: g },
+    ),
+  setGenre: (genre: Genre) => updateGroove((g, t) => setGenre(g, genre, t)),
+  setBassPattern: (pattern: BassPattern) => updateGroove((g, t) => setBassPattern(g, pattern, t)),
+  setQuantize: (patch: Partial<QuantizeSettings>) =>
+    updateGroove((g) => ({ state: { ...g, quantize: { ...g.quantize, ...patch } } })),
+  setDuck: (amount: number) => {
+    useGroove.setState({ duck: amount });
+    engine?.setParam('fx.duck', amount, engine.now(), 0.05);
+  },
+  fill: () => perform([{ type: 'drums.fill' }], []),
+  drop: () => perform([{ type: 'drums.drop' }], []),
+  tap: () => perform([{ type: 'tempo.tap' }], []),
+};
+
+// ---- scheduler ----------------------------------------------------------------------------------------------
+
+function tick() {
+  if (!engine) return;
+  const now = engine.now();
+  const from = Math.max(scheduledUntil, now);
+  const to = now + HORIZON;
+  if (to <= from) return;
+  const events = grooveWindow(groove, from, to);
+  scheduledUntil = to;
+  if (events.length) bus.emitAll(events);
+  if (groove.drums.enabled || groove.arp.enabled || groove.bassPattern !== 'sustain') {
+    const beat = Math.max(0, (now - groove.transport.origin) / (60 / groove.transport.bpm));
+    const position = `${Math.floor(beat / 4) + 1}.${(Math.floor(beat) % 4) + 1}`;
+    if (useGroove.getState().position !== position) useGroove.setState({ position });
+  }
+}
+
+function startScheduler() {
+  if (scheduler || !engine) return;
+  scheduledUntil = engine.now();
+  scheduler = setInterval(tick, TICK_MS);
+}
+
+function stopScheduler() {
+  if (scheduler) clearInterval(scheduler);
+  scheduler = null;
+}
+
+// ---- gestures -----------------------------------------------------------------------------------------------
+
 function attachPerformance() {
   if (unsubscribeLive) return;
   mapping = createMappingState();
   unsubscribeLive = live.subscribe((msg) => {
     if (!engine) return;
+    let { announced, reverted } = useMusic.getState().predictions;
+    const before = announced + reverted;
+    for (const e of msg.frame.events) {
+      if (e.type !== 'poseEnter' || !e.tentative) continue;
+      if (e.revert) reverted++;
+      else announced++;
+    }
+    if (announced + reverted !== before) useMusic.setState({ predictions: { announced, reverted } });
+
     const m = evaluateMapping(preset, msg.frame, mapping, conductor.mode);
     mapping = m.state;
     if (m.out.actions.length || m.out.params.length) {
-      perform(m.out.actions, m.out.params, { captureTime: msg.frame.timing.captureTime });
+      const t = msg.frame.timing;
+      perform(m.out.actions, m.out.params, {
+        captureTime: t.captureTime,
+        detectStart: t.detectStart,
+        detectEnd: t.detectEnd,
+        recognizeEnd: t.recognizeEnd,
+        receivedAt: msg.receivedAt,
+      });
     }
   });
+  startScheduler();
 }
 
-/** Switch presets: release what's sounding, then load the preset's instruments and mode. */
+/** Switch presets: release what's sounding, then load the preset's instruments, mode and groove. */
 export function applyPreset(next: MappingPreset): void {
   preset = next;
   mapping = createMappingState();
+  const t = (engine?.now() ?? 0) + LIVE_LOOKAHEAD;
   if (engine) {
-    const t = engine.now() + LIVE_LOOKAHEAD;
     engine.releaseAll(t);
     engine.setInstrument('chords', next.instruments.chords, t);
     engine.setInstrument('melody', next.instruments.melody, t);
@@ -196,6 +424,16 @@ export function applyPreset(next: MappingPreset): void {
     }
   }
   conductor = initialConductorState(next.defaultMode);
+  const gs = next.groove ?? {};
+  groove = {
+    ...groove,
+    harmony: { chord: null, voicing: [], bassNote: null },
+    arp: { ...groove.arp, enabled: gs.arp ?? false },
+    strum: { ...groove.strum, enabled: gs.strum ?? false },
+    drums: { ...groove.drums, enabled: gs.drums ?? false, fillBar: null, dropBar: null },
+    bassPattern: gs.bassPattern ?? 'sustain',
+  };
+  if (gs.genre && gs.genre !== groove.drums.genre) groove = setGenre(groove, gs.genre, t).state;
   useMusic.setState({
     chordInstrument: next.instruments.chords,
     melodyInstrument: next.instruments.melody,
@@ -206,6 +444,7 @@ export function applyPreset(next: MappingPreset): void {
     melodyNote: null,
   });
   useMusic.getState().setBass(next.instruments.bass);
+  syncGrooveUi();
 }
 
 usePresets.subscribe((s, prev) => {
@@ -241,8 +480,11 @@ export async function ensureAudio(): Promise<void> {
       fx: true,
     });
     if (!m.bass) engine.setParam('bass.level', 0, engine.now(), 0.01);
+    engine.setParam('fx.duck', useGroove.getState().duck, engine.now(), 0.01);
     bus.on(onMusicEvent);
     conductor = initialConductorState(preset.defaultMode);
+    groove = { ...groove, transport: { ...groove.transport, origin: engine.now() + 0.05 } };
+    applyPreset(preset);
     attachPerformance();
     useMusic.setState({ status: 'on' });
   } catch (err) {
@@ -257,13 +499,28 @@ export function releaseAll(): void {
   if (!engine) return;
   engine.releaseAll(engine.now() + LIVE_LOOKAHEAD);
   conductor = initialConductorState(preset.defaultMode);
+  // Back to the preset's own groove defaults, so nothing leaks into the next session.
+  const gs = preset.groove ?? {};
+  groove = {
+    ...groove,
+    harmony: { chord: null, voicing: [], bassNote: null },
+    arp: { ...groove.arp, enabled: gs.arp ?? false },
+    strum: { ...groove.strum, enabled: gs.strum ?? false },
+    drums: { ...groove.drums, enabled: gs.drums ?? false, fillBar: null, dropBar: null },
+    bassPattern: gs.bassPattern ?? 'sustain',
+  };
   useMusic.setState({ chord: null, melodyNote: null, latched: false });
+  syncGrooveUi();
 }
 
 export function stopAudio(): void {
   releaseAll();
+  stopScheduler();
   unsubscribeLive?.();
   unsubscribeLive = null;
 }
+
+/** For tests/debug: is the pad currently the one sounding chords? */
+export const padIsPlaying = (): boolean => padPlays(groove);
 
 export { CHORD_INSTRUMENTS, MELODY_INSTRUMENTS };

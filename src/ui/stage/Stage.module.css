@@ -6,6 +6,7 @@
   overflow: hidden;
 }
 .view {
+  container-type: inline-size;
   position: relative;
   flex: 1;
   min-width: 0;
@@ -264,4 +265,16 @@
   text-align: center;
   width: max-content;
   max-width: calc(100% - 32px);
+}
+
+/* Keep the top bar on one line: drop secondary readouts when the view gets narrow (e.g. a panel is open). */
+@container (max-width: 1180px) {
+  .optional {
+    display: none;
+  }
+}
+@container (max-width: 760px) {
+  .privacyChip {
+    display: none;
+  }
 }

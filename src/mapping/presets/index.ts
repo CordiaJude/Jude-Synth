@@ -347,4 +347,138 @@ export const DJ_FX: MappingPreset = {
   ],
 };
 
-export const BUILT_IN_PRESETS: MappingPreset[] = [CLASSIC_TWO_HAND, CHORDS_AND_MELODY, THEREMIN_PRO, DJ_FX];
+export const ARP_GROOVE: MappingPreset = {
+  id: 'arp-groove',
+  name: 'Arp & Groove',
+  description:
+    'Chords become an arpeggio over a drum groove. The free hand sets the arp speed (height) and note length (pinch); a fist on it plays a fill.',
+  version: 1,
+  builtIn: true,
+  roles: {
+    primary: 'Chords (pose = degree, tilt = borrow)',
+    secondary: 'Arp rate (height), length (pinch), fill (fist), drop (swipe down)',
+  },
+  defaultMode: 'chords',
+  instruments: { chords: 'pluck', melody: 'fmKeys', bass: true },
+  melody: { low: 60, high: 84, snap: 1 },
+  groove: { arp: true, drums: true, genre: 'synthwave', bassPattern: 'octaves' },
+  discrete: [
+    ...PRIMARY_CHORDS,
+    {
+      id: 'g-fill',
+      label: 'Fist clench → drum fill',
+      trigger: { kind: 'event', role: 'secondary', event: 'fistClench' },
+      action: { type: 'drums.fill' },
+    },
+    {
+      id: 'g-drop',
+      label: 'Swipe down → drop',
+      trigger: { kind: 'event', role: 'secondary', event: 'swipe', direction: 'down' },
+      action: { type: 'drums.drop' },
+    },
+    {
+      id: 'g-style',
+      label: 'Swipe right → next drum style',
+      trigger: { kind: 'event', role: 'secondary', event: 'swipe', direction: 'right' },
+      action: { type: 'drums.nextGenre' },
+    },
+    {
+      id: 'g-bass',
+      label: 'Swipe left → next bass pattern',
+      trigger: { kind: 'event', role: 'secondary', event: 'swipe', direction: 'left' },
+      action: { type: 'bass.nextPattern' },
+    },
+  ],
+  continuous: [
+    {
+      id: 'c-rate',
+      label: 'Height → arp rate',
+      source: 'secondary.palmY',
+      target: 'arp.rate',
+      inRange: [0.15, 0.85],
+      outRange: [0, 1],
+      curve: { kind: 'linear' },
+      invert: false,
+    },
+    {
+      id: 'c-gate',
+      label: 'Pinch → arp note length',
+      source: 'secondary.pinch',
+      target: 'arp.gate',
+      inRange: [0.05, 0.9],
+      outRange: [0.05, 1],
+      curve: { kind: 'linear' },
+      invert: false,
+    },
+    {
+      id: 'c-bright',
+      label: 'Wrist tilt → brightness',
+      source: 'secondary.roll',
+      target: 'macro.brightness',
+      inRange: [deg(-50), deg(50)],
+      outRange: [0.15, 1],
+      curve: { kind: 'linear' },
+      invert: false,
+    },
+    {
+      id: 'c-space',
+      label: 'Distance → space',
+      source: 'secondary.depth',
+      target: 'macro.space',
+      inRange: [0.25, 0.75],
+      outRange: [0.1, 0.7],
+      curve: { kind: 'linear' },
+      invert: false,
+    },
+  ],
+};
+
+export const STRUMMER: MappingPreset = {
+  id: 'strummer',
+  name: 'Strummer',
+  description:
+    'Hold a chord with one hand and strum it with the other: sweep sideways across the virtual strings — faster sweeps play louder.',
+  version: 1,
+  builtIn: true,
+  roles: {
+    primary: 'Chords (pose = degree, tilt = borrow)',
+    secondary: 'Strum (sweep left/right), tone (tilt)',
+  },
+  defaultMode: 'chords',
+  instruments: { chords: 'pluck', melody: 'fmKeys', bass: true },
+  melody: { low: 60, high: 84, snap: 1 },
+  groove: { strum: true, drums: false, genre: 'lofi', bassPattern: 'sustain' },
+  discrete: [...PRIMARY_CHORDS],
+  continuous: [
+    {
+      id: 'c-strum',
+      label: 'Sideways sweep → strum',
+      source: 'secondary.palmX',
+      target: 'strum.position',
+      inRange: [0, 1],
+      outRange: [0, 1],
+      curve: { kind: 'linear' },
+      invert: false,
+      smoothingMs: 0,
+    },
+    {
+      id: 'c-bright',
+      label: 'Wrist tilt → tone',
+      source: 'secondary.roll',
+      target: 'macro.brightness',
+      inRange: [deg(-50), deg(50)],
+      outRange: [0.2, 1],
+      curve: { kind: 'linear' },
+      invert: false,
+    },
+  ],
+};
+
+export const BUILT_IN_PRESETS: MappingPreset[] = [
+  CLASSIC_TWO_HAND,
+  CHORDS_AND_MELODY,
+  THEREMIN_PRO,
+  DJ_FX,
+  ARP_GROOVE,
+  STRUMMER,
+];

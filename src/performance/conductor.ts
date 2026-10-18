@@ -1,7 +1,8 @@
 // The conductor: musical state + actions/params → MusicEvents. Pure. Gestures (through a mapping preset),
 // the keyboard and the touch pad all speak the same Action language, so they behave identically.
 
-import type { EventCause, MusicEvent } from '../events/types';
+import type { EventCause, MusicEvent, ParamPath } from '../events/types';
+import { GROOVE_TARGETS } from './groove';
 import type { Action, MappingPreset, ParamUpdate, PerformanceMode } from '../mapping/types';
 import {
   diatonicChord,
@@ -135,8 +136,8 @@ export function conduct(
         if (s.melody.id) melodyRetune();
         else melodyOn();
       }
-    } else {
-      events.push({ kind: 'param', target: p.target, value: p.value, rampMs: p.rampMs, time });
+    } else if (!GROOVE_TARGETS.has(p.target)) {
+      events.push({ kind: 'param', target: p.target as ParamPath, value: p.value, rampMs: p.rampMs, time });
     }
   }
 

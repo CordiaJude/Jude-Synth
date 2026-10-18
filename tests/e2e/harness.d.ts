@@ -2,7 +2,7 @@
 // the e2e project doesn't compile app code).
 interface HarnessScenarioResult {
   name: string;
-  detector: 'sine' | 'transient';
+  detector: 'sine' | 'transient' | 'levels';
   threshold?: number;
   clicks: number;
   firstClicks: Array<{ time: number; ratio: number }>;

@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { APP_NAME } from '../../config/app';
 import { useLiveSnapshot } from '../../state/live';
-import { useMusic } from '../../state/music';
+import { useGroove, useMusic } from '../../state/music';
 import { startCamera, stopSession } from '../../state/session';
 import { useApp } from '../../state/store';
 import { CalibrationFlow } from '../calibration/CalibrationFlow';
 import { DebugPanel } from '../debug/DebugPanel';
+import { GroovePanel } from '../groove/GroovePanel';
 import { MappingEditor } from '../mapping/MappingEditor';
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { useKeyboardInput } from '../useKeyboardInput';
@@ -40,7 +41,7 @@ function TopBar() {
         ● on-device only
       </span>
       {source !== 'manual' && (
-        <span className={styles.chip}>
+        <span className={`${styles.chip} ${styles.optional}`}>
           <strong className="tabular">{fps}</strong> fps
         </span>
       )}
@@ -50,15 +51,25 @@ function TopBar() {
           {soundLatency ? 'to sound' : 'tracking'}
         </span>
       )}
-      {source === 'demo' && <span className={styles.chip}>demo · synthetic hands</span>}
-      {source === 'manual' && <span className={styles.chip}>keyboard · touch</span>}
+      {source === 'demo' && (
+        <span className={`${styles.chip} ${styles.optional}`}>demo · synthetic hands</span>
+      )}
+      {source === 'manual' && <span className={`${styles.chip} ${styles.optional}`}>keyboard · touch</span>}
       {vision?.delegate && (
-        <span className={styles.chip}>
+        <span className={`${styles.chip} ${styles.optional}`}>
           {vision.delegate} · tier {vision.tier ?? '…'}
         </span>
       )}
       <span className={styles.spacer} />
+      <GrooveChip />
       <nav className={styles.nav} aria-label="Panels">
+        <button
+          className={styles.btn}
+          aria-pressed={panel === 'groove'}
+          onClick={() => togglePanel('groove')}
+        >
+          Groove
+        </button>
         <button
           className={styles.btn}
           aria-pressed={panel === 'mappings'}
@@ -81,6 +92,16 @@ function TopBar() {
         </button>
       </nav>
     </header>
+  );
+}
+
+function GrooveChip() {
+  const { bpm, position, arp, drums, strum } = useGroove();
+  const parts = [drums && 'drums', arp.enabled && 'arp', strum && 'strum'].filter(Boolean).join(' · ');
+  return (
+    <span className={styles.chip} title="Tempo and bar.beat">
+      <strong className="tabular">{Math.round(bpm)}</strong> bpm{parts ? ` · ${parts} · ${position}` : ''}
+    </span>
   );
 }
 
@@ -161,6 +182,7 @@ export function Stage() {
       {panel === 'debug' && <DebugPanel />}
       {panel === 'mappings' && <MappingEditor />}
       {panel === 'settings' && <SettingsPanel />}
+      {panel === 'groove' && <GroovePanel />}
     </div>
   );
 }
