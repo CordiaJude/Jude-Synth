@@ -1,5 +1,5 @@
 import { APP_NAME, APP_TAGLINE, PRIVACY_STATEMENT } from '../../config/app';
-import { requestCamera, startDemo } from '../../state/session';
+import { requestCamera, startDemo, startManual } from '../../state/session';
 import { useApp } from '../../state/store';
 import styles from './Landing.module.css';
 
@@ -40,14 +40,18 @@ export function Landing() {
           <button className={styles.primaryBtn} onClick={requestCamera} autoFocus>
             Enable camera
           </button>
+          <button className={styles.ghostBtn} onClick={startManual}>
+            Play with keyboard / touch
+          </button>
           <button className={styles.ghostBtn} onClick={startDemo}>
-            Try the demo (no camera)
+            Watch the demo
           </button>
         </div>
 
         <ul className={styles.steps}>
           <li>Your browser will ask for camera permission. Nothing starts until you allow it.</li>
           <li>Best with good front lighting and both hands visible, about an arm’s length away.</li>
+          <li>No camera? Everything can be played from the keyboard or by touch.</li>
         </ul>
       </div>
     </main>

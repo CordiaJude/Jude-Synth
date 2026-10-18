@@ -10,10 +10,13 @@ data ever leaves the browser (enforced by a `connect-src 'self'` Content-Securit
 
 - **Phase 1 — tracking core:** hand tracking in a Web Worker, One Euro smoothing, stable hand IDs, a
   rotation-invariant pose recognizer, continuous features, gesture events, debug overlay, capture & label tool.
-- **Phase 2 — sound (this build):** theory engine (7 modes, diatonic 7ths/9ths, sus, modal interchange,
+- **Phase 2 — sound:** theory engine (7 modes, diatonic 7ths/9ths, sus, modal interchange,
   Roman numerals, automatic voice leading, scale quantizer), a click-free polyphonic synth (Supersaw Pad,
   Warm Analog Poly, Sub Bass), an FX bus (chorus, tempo-synced ping-pong delay, procedural convolution
   reverb, tape saturation and lookahead limiter as AudioWorklets), and the **Classic Two-Hand** preset.
+- **Phase 3 — mapping & UX (this build):** a declarative gesture → music mapping layer with four presets
+  and a live editor, four more instruments (FM Keys, Pluck, Glass Bell, Theremin Lead with tremor vibrato),
+  10-second calibration, keyboard and touch play (no camera needed), accessibility settings.
 
 ## Run it locally
 
@@ -40,7 +43,43 @@ Other scripts:
 If Playwright's own Chromium isn't installed, point it at any Chromium:
 `PLAYWRIGHT_CHROMIUM_PATH=/path/to/chrome pnpm e2e`.
 
-## Playing Classic Two-Hand (Phase 2)
+## Presets
+
+| Preset | Primary hand (left) | Secondary hand (right) |
+|---|---|---|
+| **Classic Two-Hand** | chord by pose, tilt = borrow, fist = release | shape (triad/7th/9th/sus4), height = volume, tilt = brightness, distance = space |
+| **One-Hand Chords + Melody** | chords; height = pad level | pinch = play a note, height = pitch (scale-locked), swipe up/down = octave |
+| **Theremin Pro** | height = volume, distance = space | height = pitch (pulled 60% to the scale), tilt = tone, **hand tremor = vibrato** |
+| **DJ/FX** | chords; height = master volume | left/right = DJ filter (centre off), height = delay, tilt = feedback, distance = reverb, close hand = grit |
+
+Open **Mappings** to see exactly what each gesture does, with live meters and curve previews. Change any
+source, target, range, curve, inversion or deadzone; press **Learn** and move to assign whatever you moved
+most; add or remove gesture triggers. Editing a built-in preset saves a copy. Presets are stored in this
+browser and can be exported/imported as JSON (imports are validated).
+
+## No camera? Keyboard and touch
+
+Choose **Play with keyboard / touch** on the start page (or enable the touch pad in Settings).
+
+| Keys | Does |
+|---|---|
+| `1`–`7` (Shift = borrowed) | chord on degree I…VII |
+| `Q` `W` `E` `R` | triad · 7th · 9th · sus4 |
+| `↑` `↓` / `←` `→` | chord octave / inversion |
+| `Space` or `0` / `L` | release / latch |
+| `Z` … `/` | melody notes (scale degrees 1–10) |
+
+The touch pad has the seven degree pads (labelled with Roman numeral and chord name), shapes, borrow,
+latch and release, plus a melody strip for the melody/theremin presets.
+
+## Calibration and settings
+
+The first time the camera starts, a 10-second calibration (open palm → fist → pinch) learns your range of
+motion; the timer pauses whenever no hand is visible. It is saved locally and can be redone or reset in
+**Settings**, which also has reduced motion (or follow the OS), a high-contrast palette, and the keyboard
+reference.
+
+## Playing Classic Two-Hand
 
 | Hand | Gesture | Does |
 |---|---|---|

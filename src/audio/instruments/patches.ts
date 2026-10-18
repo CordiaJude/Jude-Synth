@@ -106,10 +106,117 @@ export const TEST_SINE: Patch = {
   level: 0.3,
 };
 
+/** Two-operator FM electric piano: a soft 1:1 body plus a short, bright 14:1 "tine" on the attack. */
+export const FM_KEYS: Patch = {
+  id: 'fmKeys',
+  name: 'FM Keys',
+  maxVoices: 10,
+  oscs: [{ type: 'sine', gain: 0.55 }],
+  fm: [
+    { ratio: 1, index: 1.5, decay: 1.4, sustain: 0.22 },
+    { ratio: 14, index: 0.28, decay: 0.09, sustain: 0 },
+  ],
+  filter: {
+    type: 'lowpass',
+    Q: 0.5,
+    cutoff: [1800, 14000],
+    keyTrack: 0.2,
+    env: { amount: 0, attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 },
+  },
+  amp: { attack: 0.004, decay: 1.8, sustain: 0.3, release: 0.4 },
+  velocitySens: 0.7,
+  glide: 0.03,
+  transition: 'crossfade',
+  crossfade: 0.05,
+  level: 0.28,
+};
+
+/** Bright plucked string: fast filter snap, no sustain — great for strums and arpeggios. */
+export const PLUCK: Patch = {
+  id: 'pluck',
+  name: 'Pluck',
+  maxVoices: 12,
+  oscs: [
+    { type: 'sawtooth', detune: -3, gain: 0.3, pan: -0.2 },
+    { type: 'square', detune: 4, gain: 0.14, pan: 0.2 },
+  ],
+  filter: {
+    type: 'lowpass',
+    Q: 1.1,
+    cutoff: [380, 7000],
+    keyTrack: 0.6,
+    env: { amount: 3200, attack: 0.004, decay: 0.2, sustain: 0, release: 0.2 },
+  },
+  amp: { attack: 0.003, decay: 0.9, sustain: 0, release: 0.25 },
+  velocitySens: 0.7,
+  glide: 0.02,
+  transition: 'crossfade',
+  crossfade: 0.03,
+  level: 0.22,
+};
+
+/** Inharmonic FM bell: glassy, long ringing decay. */
+export const GLASS_BELL: Patch = {
+  id: 'glassBell',
+  name: 'Glass Bell',
+  maxVoices: 12,
+  oscs: [{ type: 'sine', gain: 0.5 }],
+  fm: [
+    { ratio: 3.5, index: 2, decay: 1.6, sustain: 0.08 },
+    { ratio: 7.07, index: 0.5, decay: 0.3, sustain: 0 },
+  ],
+  filter: {
+    type: 'lowpass',
+    Q: 0.5,
+    cutoff: [2500, 16000],
+    keyTrack: 0,
+    env: { amount: 0, attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 },
+  },
+  amp: { attack: 0.003, decay: 3.2, sustain: 0, release: 1.4 },
+  velocitySens: 0.6,
+  glide: 0.02,
+  transition: 'crossfade',
+  crossfade: 0.05,
+  level: 0.2,
+};
+
+/** Monophonic singing lead with portamento and a tremor-driven vibrato. */
+export const THEREMIN_LEAD: Patch = {
+  id: 'thereminLead',
+  name: 'Theremin Lead',
+  maxVoices: 2,
+  mono: true,
+  oscs: [
+    { type: 'sine', gain: 0.6 },
+    { type: 'triangle', gain: 0.16 },
+    { type: 'sine', octave: 1, gain: 0.05 },
+  ],
+  filter: {
+    type: 'lowpass',
+    Q: 0.9,
+    cutoff: [700, 7000],
+    keyTrack: 0.6,
+    env: { amount: 0, attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 },
+  },
+  amp: { attack: 0.045, decay: 0.3, sustain: 1, release: 0.35 },
+  velocitySens: 0.2,
+  glide: 0.07,
+  transition: 'legato',
+  crossfade: 0.05,
+  level: 0.3,
+  drive: 0.15,
+  vibrato: { rate: 5.6, maxCents: 70 },
+};
+
 export const PATCHES = {
   supersawPad: SUPERSAW_PAD,
   warmPoly: WARM_POLY,
   subBass: SUB_BASS,
+  fmKeys: FM_KEYS,
+  pluck: PLUCK,
+  glassBell: GLASS_BELL,
+  thereminLead: THEREMIN_LEAD,
   testSine: TEST_SINE,
 };
-export const CHORD_INSTRUMENTS = [SUPERSAW_PAD, WARM_POLY] as const;
+export const CHORD_INSTRUMENTS = [SUPERSAW_PAD, WARM_POLY, FM_KEYS, PLUCK, GLASS_BELL] as const;
+export const MELODY_INSTRUMENTS = [THEREMIN_LEAD, FM_KEYS, PLUCK, GLASS_BELL] as const;

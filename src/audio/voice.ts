@@ -37,7 +37,11 @@ export class Voice {
   silentAfter = -Infinity;
   private velocity = 1;
   private brightnessHz: number;
+  private brightness01 = 1;
   private spread = 1;
+  /** FM operators: modulator → index envelope (unitless) → ×modulator frequency (Hz) → carrier frequency. */
+  private fm: Array<{ osc: OscillatorNode; index: GainNode; hz: GainNode }> = [];
+  private vibrato: { lfo: OscillatorNode; depth: GainNode } | null = null;
 
   constructor(
     private ctx: BaseContext,
@@ -74,6 +78,30 @@ export class Voice {
       }
       this.oscs.push(osc);
     }
+    for (const op of patch.fm ?? []) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = midiToFreq(60) * op.ratio;
+      const index = ctx.createGain();
+      index.gain.value = 0;
+      const hz = ctx.createGain();
+      hz.gain.value = midiToFreq(60) * op.ratio;
+      osc.connect(index);
+      index.connect(hz);
+      for (const carrier of this.oscs) hz.connect(carrier.frequency);
+      this.fm.push({ osc, index, hz });
+    }
+    if (patch.vibrato) {
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = patch.vibrato.rate * (0.95 + Math.random() * 0.1);
+      const depth = ctx.createGain();
+      depth.gain.value = 0;
+      lfo.connect(depth);
+      for (const o of this.oscs) depth.connect(o.detune);
+      for (const op of this.fm) depth.connect(op.osc.detune);
+      this.vibrato = { lfo, depth };
+    }
     mixIn.connect(this.filter);
     this.filter.connect(this.vca);
     if (patch.drive) {
@@ -89,10 +117,14 @@ export class Voice {
     // Random start offsets → random relative phases between detuned oscillators (no phasey attack).
     const t = ctx.currentTime;
     this.oscs.forEach((o, i) => o.start(t + (i === 0 ? 0 : Math.random() * 0.01)));
+    for (const op of this.fm) op.osc.start(t);
+    this.vibrato?.lfo.start(t);
   }
 
-  /** Free at `time` (not gated and already silent). */
+  /** Free at `time`: not gated and already silent — or a one-shot (no sustain) that has decayed away. */
   isFree(time: number): boolean {
+    const a = this.patch.amp;
+    if (this.gateOn && a.sustain === 0) return time >= this.startedAt + a.attack + 3 * a.decay;
     return !this.gateOn && time >= this.silentAfter;
   }
 
@@ -114,6 +146,23 @@ export class Voice {
         glideTo(p, target, time, glide / 3);
       }
     });
+    this.patch.fm?.forEach((spec, i) => {
+      const op = this.fm[i]!;
+      const target = f * spec.ratio;
+      for (const p of [op.osc.frequency, op.hz.gain]) {
+        if (glide <= 0) {
+          p.cancelScheduledValues(time);
+          p.setValueAtTime(target, time);
+        } else {
+          glideTo(p, target, time, glide / 3);
+        }
+      }
+    });
+  }
+
+  /** FM index scale from brightness: darker = gentler modulation. */
+  private fmScale(): number {
+    return 0.35 + 0.95 * this.brightness01;
   }
 
   /**
@@ -138,6 +187,13 @@ export class Voice {
     const a = Math.max(0.003, attack ?? p.amp.attack);
     glideTo(this.vca.gain, peak, t, a / 3);
     this.vca.gain.setTargetAtTime(peak * p.amp.sustain, t + a, Math.max(MIN_TAU, p.amp.decay / 3));
+
+    p.fm?.forEach((spec, i) => {
+      const peak = spec.index * this.fmScale() * (0.55 + 0.45 * velocity);
+      const idx = this.fm[i]!.index.gain;
+      glideTo(idx, peak, t, Math.max(MIN_TAU, a / 3));
+      idx.setTargetAtTime(peak * spec.sustain, t + a, Math.max(MIN_TAU, spec.decay / 3));
+    });
 
     const fe = p.filter.env;
     const cutoff = this.cutoffFor(note);
@@ -178,12 +234,14 @@ export class Voice {
     }
     glideTo(this.vca.gain, 0, time, r / 4);
     glideTo(this.filter.detune, 0, time, Math.max(MIN_TAU, this.patch.filter.env.release / 3));
+    for (const op of this.fm) glideTo(op.index.gain, 0, time, r / 3);
     // τ = r/4 → −70 dB after ~8τ = 2r.
     this.silentAfter = time + 2 * r;
   }
 
-  setBrightness(hz: number, time: number, seconds: number): void {
+  setBrightness(hz: number, time: number, seconds: number, x01 = this.brightness01): void {
     this.brightnessHz = hz;
+    this.brightness01 = x01;
     // Never cancel a cutoff jump scheduled by a note start at (or after) this time: glide from just after it.
     const at = this.startedAt >= time ? this.startedAt + 1 / this.ctx.sampleRate : time;
     glideTo(this.filter.frequency, this.cutoffFor(this.note ?? 60), at, Math.max(MIN_TAU, seconds / 3));
@@ -198,6 +256,13 @@ export class Voice {
     });
   }
 
+  /** Vibrato depth 0..1 (of the patch's maxCents). */
+  setVibrato(depth01: number, time: number, seconds: number): void {
+    if (!this.vibrato || !this.patch.vibrato) return;
+    const cents = Math.max(0, Math.min(1, depth01)) * this.patch.vibrato.maxCents;
+    glideTo(this.vibrato.depth.gain, cents, time, Math.max(MIN_TAU, seconds / 3));
+  }
+
   /** Rough current loudness for voice stealing (higher = louder). */
   loudness(time: number): number {
     if (this.gateOn) return 1 + this.velocity;
@@ -206,7 +271,11 @@ export class Voice {
   }
 
   dispose(): void {
-    for (const o of this.oscs) {
+    for (const o of [
+      ...this.oscs,
+      ...this.fm.map((f) => f.osc),
+      ...(this.vibrato ? [this.vibrato.lfo] : []),
+    ]) {
       try {
         o.stop();
       } catch {

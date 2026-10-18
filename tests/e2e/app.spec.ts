@@ -23,7 +23,7 @@ test('landing explains camera use and privacy up front', async ({ page }) => {
 
 test('demo mode recognizes synthetic poses without a camera', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /Try the demo/ }).click();
+  await page.getByRole('button', { name: 'Watch the demo' }).click();
   const primary = page.getByRole('region', { name: 'Primary hand' });
   await expect(primary).toBeVisible();
   // The demo cycles open → one → two …; we should see at least two different recognized poses.
@@ -34,6 +34,7 @@ test('demo mode recognizes synthetic poses without a camera', async ({ page }) =
     await page.waitForTimeout(150);
   }
   expect(seen.size).toBeGreaterThanOrEqual(3);
+  await page.getByRole('button', { name: 'Debug' }).click();
   await expect(page.getByLabel('Debug panel')).toBeVisible();
 
   // Phase 2: the gestures drive chords. The chord display shows a name and a Roman numeral in C major.
@@ -55,6 +56,7 @@ test('camera pipeline runs in a worker without blocking the main thread', async 
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
   await page.getByRole('button', { name: 'Enable camera' }).click();
+  await page.getByRole('button', { name: 'Debug' }).click();
 
   const panel = page.getByLabel('Debug panel');
   // MediaPipe is loaded from same-origin assets under the production CSP; GPU may fall back to CPU here.

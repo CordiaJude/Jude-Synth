@@ -12,6 +12,10 @@ export interface OverlayColors {
   primary: string;
   secondary: string;
   text: string;
+  /** Glow (off in reduced-motion mode: less visual noise). */
+  glow: boolean;
+  /** Line thickness multiplier (high-contrast mode draws thicker). */
+  lineScale: number;
 }
 
 export function drawOverlay(
@@ -42,8 +46,8 @@ export function drawOverlay(
     ctx.lineCap = 'round';
     ctx.strokeStyle = color;
     ctx.shadowColor = color;
-    ctx.shadowBlur = 12 * dpr;
-    ctx.lineWidth = 3 * dpr;
+    ctx.shadowBlur = colors.glow ? 12 * dpr : 0;
+    ctx.lineWidth = 3 * dpr * colors.lineScale;
     ctx.beginPath();
     for (const [a, b] of HAND_BONES) {
       ctx.moveTo(px(a), py(a));
@@ -58,7 +62,13 @@ export function drawOverlay(
       const extended = tipIndex >= 0 && fingers[tipIndex]?.extended;
       ctx.fillStyle = extended ? colors.text : color;
       ctx.beginPath();
-      ctx.arc(px(i), py(i), (tipIndex >= 0 ? (extended ? 7 : 4.5) : 3) * dpr, 0, Math.PI * 2);
+      ctx.arc(
+        px(i),
+        py(i),
+        (tipIndex >= 0 ? (extended ? 7 : 4.5) : 3) * dpr * colors.lineScale,
+        0,
+        Math.PI * 2,
+      );
       ctx.fill();
     }
 
@@ -81,7 +91,11 @@ export function drawOverlay(
 }
 
 /** Redraw the overlay on animation frames whenever a new gesture frame arrives. Returns a cleanup fn. */
-export function attachOverlay(el: HTMLCanvasElement, enabled: boolean): () => void {
+export function attachOverlay(
+  el: HTMLCanvasElement,
+  enabled: boolean,
+  style: { reduceMotion: boolean; highContrast: boolean },
+): () => void {
   const ctx = el.getContext('2d');
   if (!ctx) return () => undefined;
   const css = getComputedStyle(document.documentElement);
@@ -89,6 +103,8 @@ export function attachOverlay(el: HTMLCanvasElement, enabled: boolean): () => vo
     primary: css.getPropertyValue('--primary').trim() || '#3fa7ff',
     secondary: css.getPropertyValue('--secondary').trim() || '#ff9f2e',
     text: css.getPropertyValue('--text').trim() || '#fff',
+    glow: !style.reduceMotion,
+    lineScale: style.highContrast ? 1.7 : 1,
   };
   let raf = 0;
   let dirty = true;

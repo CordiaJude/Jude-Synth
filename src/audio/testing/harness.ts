@@ -108,7 +108,52 @@ function torture(
  * discontinuity — it only adds harmonics, which would force a looser bound.)
  */
 function sineify(p: Patch): Patch {
-  return { ...p, drive: 0, oscs: p.oscs.map((o) => ({ ...o, type: 'sine' as const })) };
+  // FM operators are removed too: their index envelopes are the same setTarget ramps as everything else,
+  // but frequency modulation would widen the spectrum past the strict bound.
+  return { ...p, drive: 0, fm: [], oscs: p.oscs.map((o) => ({ ...o, type: 'sine' as const })) };
+}
+
+/** Theremin-style playing: one sustained note whose pitch is moved continuously by the hand, with vibrato. */
+function thereminPerformance(e: AudioEngine, seconds: number) {
+  e.setParam('melody.level', 1, 0, 0.001);
+  let t = 0.05;
+  let id = 0;
+  let on = false;
+  let k = 0;
+  while (t < seconds - 0.5) {
+    const note = 55 + 29 * (0.5 + 0.5 * Math.sin(t * 1.7)) + 0.4 * Math.sin(t * 9);
+    if (!on) {
+      id++;
+      e.schedule({ kind: 'noteOn', id: `t${id}`, slot: 'melody', note, velocity: 0.8, time: t });
+      on = true;
+    } else {
+      e.schedule({ kind: 'pitch', id: `t${id}`, slot: 'melody', note, glide: 0.06, time: t });
+    }
+    if (k % 10 === 0)
+      e.schedule({
+        kind: 'param',
+        target: 'melody.vibrato',
+        value: 0.5 + 0.5 * Math.sin(t),
+        rampMs: 150,
+        time: t,
+      });
+    if (k % 25 === 0)
+      e.schedule({
+        kind: 'param',
+        target: 'melody.level',
+        value: 0.4 + 0.6 * Math.abs(Math.sin(t * 0.7)),
+        rampMs: 60,
+        time: t,
+      });
+    if (k % 60 === 59) {
+      e.schedule({ kind: 'noteOff', id: `t${id}`, slot: 'melody', time: t + 0.01 });
+      on = false;
+      t += 0.25;
+    }
+    t += 0.02;
+    k++;
+  }
+  e.schedule({ kind: 'noteOff', id: `t${id}`, slot: 'melody', time: seconds - 0.5 });
 }
 
 /** A musical progression with the gesture-driven parameter sweeps a real performance produces. */
@@ -218,7 +263,7 @@ function scenarios(): Scenario[] {
   //    construction — and with sines the strict detector applies. Reverb/delay are linear time-invariant
   //    (the IR fades in), so they can't create a click; they're off to keep the test sharp, as is tape drive
   //    (a smooth memoryless curve, unit-tested separately).
-  for (const id of ['supersawPad', 'warmPoly', 'subBass'] as InstrumentId[]) {
+  for (const id of ['supersawPad', 'warmPoly', 'fmKeys', 'pluck', 'glassBell', 'subBass'] as InstrumentId[]) {
     for (const interval of [0.5, 0.15]) {
       list.push({
         name: `${id} (sine-ified) + chorus/tape/limiter, change every ${interval * 1000} ms`,
@@ -239,8 +284,28 @@ function scenarios(): Scenario[] {
       });
     }
   }
+  // 3a. Theremin Lead: continuous pitch glides + tremor vibrato + level moves, strict detector.
+  list.push({
+    name: 'thereminLead (sine-ified): continuous pitch, vibrato, level',
+    seconds: 8,
+    opts: { chords: 'testSine', bass: null, melody: 'thereminLead', fx: true, patchTransform: sineify },
+    detector: 'sine',
+    maxFreq: MAX_SINE_FREQ,
+    script: (e, s) => {
+      e.setParam('fx.reverb.mix', 0, 0.001, 0.001);
+      e.setParam('fx.delay.mix', 0, 0.001, 0.001);
+      thereminPerformance(e, s);
+    },
+  });
   // 3b. Real waveforms, full FX: gross-artifact check (NaNs, level, limiter) on what users actually hear.
-  for (const id of ['supersawPad', 'warmPoly'] as InstrumentId[]) {
+  list.push({
+    name: 'thereminLead, full FX (real waveforms)',
+    seconds: 8,
+    opts: { chords: 'testSine', bass: null, melody: 'thereminLead', fx: true },
+    detector: 'transient',
+    script: (e, s) => thereminPerformance(e, s),
+  });
+  for (const id of ['supersawPad', 'warmPoly', 'fmKeys', 'pluck', 'glassBell'] as InstrumentId[]) {
     list.push({
       name: `${id} + subBass, full FX (real waveforms)`,
       instrument: id,

@@ -74,3 +74,22 @@ button {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Explicit reduced-motion choice (in addition to the OS media query above). */
+html[data-motion='reduce'] *,
+html[data-motion='reduce'] *::before,
+html[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* High-contrast palette: brighter role colours, stronger lines. */
+html[data-palette='highContrast'] {
+  --primary: #00e5ff;
+  --secondary: #ffd400;
+  --text-dim: #c9cede;
+  --text-faint: #9aa0b3;
+  --line: rgba(255, 255, 255, 0.2);
+  --line-strong: rgba(255, 255, 255, 0.45);
+  --bg-panel: rgba(0, 0, 0, 0.92);
+}

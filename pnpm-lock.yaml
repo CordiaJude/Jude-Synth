@@ -20,6 +20,9 @@ importers:
       tone:
         specifier: 15.1.22
         version: 15.1.22
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
       zustand:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.3.0)(react@19.3.1)

@@ -243,3 +243,25 @@
   color: var(--text-dim);
   margin-top: 4px;
 }
+.latch {
+  color: var(--warn);
+  font-weight: 700;
+}
+.nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.manualHint {
+  position: absolute;
+  left: 50%;
+  bottom: 210px;
+  transform: translateX(-50%);
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+  width: max-content;
+  max-width: calc(100% - 32px);
+}

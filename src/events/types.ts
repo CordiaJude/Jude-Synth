@@ -5,19 +5,27 @@ import type { Chord } from '../theory/chords';
 import type { Midi } from '../theory/notes';
 
 export type InstrumentSlot = 'chords' | 'melody' | 'bass' | 'drums';
-export type ParamPath =
-  | 'master.volume'
-  | 'macro.brightness'
-  | 'macro.space'
-  | 'macro.motion'
-  | 'macro.grit'
-  | 'fx.chorus.mix'
-  | 'fx.delay.mix'
-  | 'fx.delay.feedback'
-  | 'fx.reverb.mix'
-  | 'fx.tape.drive'
-  | 'chords.level'
-  | 'bass.level';
+/** Every continuous engine parameter (all normalized 0..1 unless noted). */
+export const PARAM_PATHS = [
+  'master.volume',
+  'macro.brightness',
+  'macro.space',
+  'macro.motion',
+  'macro.grit',
+  'fx.chorus.mix',
+  'fx.delay.mix',
+  'fx.delay.feedback',
+  'fx.reverb.mix',
+  'fx.tape.drive',
+  /** DJ-style master filter: 0 = low-pass closed, 0.5 = bypass, 1 = high-pass closed. */
+  'fx.djFilter',
+  'chords.level',
+  'bass.level',
+  'melody.level',
+  /** Vibrato depth on the melody instrument (0..1 → 0..70 cents). */
+  'melody.vibrato',
+] as const;
+export type ParamPath = (typeof PARAM_PATHS)[number];
 
 /** What caused an event — lets us measure camera-to-sound latency. */
 export interface EventCause {
@@ -38,6 +46,8 @@ export type MusicEvent =
       cause?: EventCause;
     }
   | { kind: 'noteOff'; id: string; slot: InstrumentSlot; time: number }
+  /** Continuous pitch for a sounding note (theremin / melody glide). `note` may be fractional. */
+  | { kind: 'pitch'; id: string; slot: InstrumentSlot; note: Midi; glide: number; time: number }
   | {
       kind: 'chord';
       slot: InstrumentSlot;

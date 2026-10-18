@@ -12,13 +12,18 @@ import { Ducker } from './fx/ducker';
 import { Reverb } from './fx/reverb';
 import { PATCHES } from './instruments/patches';
 import type { InstrumentId, Patch } from './instruments/types';
-import { faderToGain, glideTo, MIN_TAU } from './params';
+import { expRange, faderToGain, glideTo, MIN_TAU } from './params';
+
+/** DJ filter "open" cutoffs: effectively bypassed. */
+const DJ_OPEN_LP = (sampleRate: number) => 0.45 * sampleRate;
+const DJ_OPEN_HP = 12;
 import { VoiceManager } from './voiceManager';
 import processorsUrl from './worklets/processors.worklet.ts?worker&url';
 
 export interface EngineOptions {
   chords?: InstrumentId;
   bass?: InstrumentId | null;
+  melody?: InstrumentId | null;
   /** false = bypass chorus/delay/reverb/tape (used by the strict click test). */
   fx?: boolean;
   bpm?: number;
@@ -36,13 +41,16 @@ export interface EngineLatency {
 export const LIVE_LOOKAHEAD = 0.012;
 
 type Slot = { manager: VoiceManager; gain: GainNode; id: InstrumentId };
+export type SlotName = 'chords' | 'bass' | 'melody';
 
 export class AudioEngine {
   readonly ctx: Tone.BaseContext;
   readonly analyser: AnalyserNode;
   readonly ducker: Ducker;
   private slots: Partial<Record<InstrumentSlot, Slot>> = {};
-  private slotInputs: Record<'chords' | 'bass', AudioNode>;
+  private slotInputs: Record<SlotName, AudioNode>;
+  private djLow: BiquadFilterNode;
+  private djHigh: BiquadFilterNode;
   private master: GainNode;
   private limiter: AudioWorkletNode | null;
   private tape: AudioWorkletNode | null;
@@ -86,6 +94,7 @@ export class AudioEngine {
 
     const chordsIn = ctx.createGain();
     const bassIn = ctx.createGain();
+    const melodyIn = ctx.createGain();
     if (fx) {
       this.chorus = new Tone.Chorus({
         frequency: 0.45,
@@ -100,7 +109,8 @@ export class AudioEngine {
       chordsIn.connect(preFx);
     }
     bassIn.connect(preFx);
-    this.slotInputs = { chords: chordsIn, bass: bassIn };
+    melodyIn.connect(preFx);
+    this.slotInputs = { chords: chordsIn, bass: bassIn, melody: melodyIn };
 
     const afterTape: AudioNode = this.tape ?? preFx;
     if (this.tape) preFx.connect(this.tape);
@@ -122,7 +132,19 @@ export class AudioEngine {
       this.reverb.output.connect(sum);
     }
 
-    sum.connect(this.ducker.node);
+    // DJ filter: a low-pass and a high-pass always in series; "bypass" is both wide open, so sweeping
+    // through the centre never switches anything in or out (no clicks).
+    this.djLow = ctx.createBiquadFilter();
+    this.djLow.type = 'lowpass';
+    this.djLow.Q.value = 0.9;
+    this.djLow.frequency.value = DJ_OPEN_LP(ctx.sampleRate);
+    this.djHigh = ctx.createBiquadFilter();
+    this.djHigh.type = 'highpass';
+    this.djHigh.Q.value = 0.9;
+    this.djHigh.frequency.value = DJ_OPEN_HP;
+    sum.connect(this.djLow);
+    this.djLow.connect(this.djHigh);
+    this.djHigh.connect(this.ducker.node);
     this.ducker.node.connect(this.master);
     if (this.limiter) {
       this.master.connect(this.limiter);
@@ -134,6 +156,7 @@ export class AudioEngine {
 
     this.setInstrument('chords', opts.chords ?? 'supersawPad', ctx.currentTime);
     if (opts.bass !== null) this.setInstrument('bass', opts.bass ?? 'subBass', ctx.currentTime);
+    if (opts.melody) this.setInstrument('melody', opts.melody, ctx.currentTime);
     if (opts.bpm) ctx.transport.bpm.value = opts.bpm;
   }
 
@@ -175,7 +198,7 @@ export class AudioEngine {
   }
 
   /** Swap an instrument: the old one releases its notes and fades out, the new one fades in. */
-  setInstrument(slot: 'chords' | 'bass', id: InstrumentId, time: number): void {
+  setInstrument(slot: SlotName, id: InstrumentId, time: number): void {
     const old = this.slots[slot];
     if (old?.id === id) return;
     const gain = this.ctx.createGain();
@@ -212,6 +235,9 @@ export class AudioEngine {
         break;
       case 'noteOff':
         this.manager(e.slot)?.noteOff(e.id, e.time);
+        break;
+      case 'pitch':
+        this.manager(e.slot)?.pitchNote(e.id, e.note, e.time, e.glide);
         break;
       case 'param':
         this.setParam(e.target, e.value, e.time, e.rampMs / 1000);
@@ -267,6 +293,20 @@ export class AudioEngine {
       case 'chords.level':
         if (this.slots.chords) glideTo(this.slots.chords.gain.gain, v, time, tau);
         break;
+      case 'melody.level':
+        if (this.slots.melody) glideTo(this.slots.melody.gain.gain, v, time, tau);
+        break;
+      case 'melody.vibrato':
+        this.slots.melody?.manager.setVibrato(v, time, seconds);
+        break;
+      case 'fx.djFilter': {
+        const sr = this.ctx.sampleRate;
+        const lp = v < 0.5 ? expRange(v / 0.5, 140, DJ_OPEN_LP(sr)) : DJ_OPEN_LP(sr);
+        const hp = v > 0.5 ? expRange((v - 0.5) / 0.5, DJ_OPEN_HP, 5000) : DJ_OPEN_HP;
+        glideTo(this.djLow.frequency, lp, time, tau);
+        glideTo(this.djHigh.frequency, hp, time, tau);
+        break;
+      }
       case 'bass.level':
         if (this.slots.bass) glideTo(this.slots.bass.gain.gain, v, time, tau);
         break;

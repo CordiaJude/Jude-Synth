@@ -1,0 +1,108 @@
+.pad {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  max-width: calc(100% - 24px);
+  touch-action: none;
+  user-select: none;
+}
+.chords {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.degrees {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(52px, 76px));
+  gap: 6px;
+}
+.degree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 72px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-panel);
+  backdrop-filter: blur(10px);
+  transition:
+    transform 80ms ease,
+    background 80ms ease;
+}
+.degree:active {
+  transform: scale(0.97);
+}
+.degree[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: rgba(63, 167, 255, 0.18);
+}
+.roman {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 17px;
+}
+.name {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.small {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-panel);
+  font-size: 13px;
+  min-height: 36px;
+}
+.small[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.strip {
+  position: relative;
+  width: 84px;
+  min-height: 160px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(to top, rgba(255, 159, 46, 0.06), rgba(255, 159, 46, 0.22)), var(--bg-panel);
+  cursor: ns-resize;
+}
+.stripLabel {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.stripThumb {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 3px;
+  background: var(--secondary);
+}
+@media (max-width: 640px) {
+  .degrees {
+    grid-template-columns: repeat(4, minmax(56px, 1fr));
+  }
+  .strip {
+    width: 64px;
+  }
+}

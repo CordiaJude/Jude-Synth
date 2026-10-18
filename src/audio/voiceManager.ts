@@ -119,7 +119,17 @@ export class VoiceManager {
     this.brightness = x01;
     const [lo, hi] = this.patch.filter.cutoff;
     const hz = lo * Math.pow(hi / lo, Math.max(0, Math.min(1, x01)));
-    for (const v of this.voices) v.setBrightness(hz, time, seconds);
+    for (const v of this.voices) v.setBrightness(hz, time, seconds, x01);
+  }
+
+  setVibrato(depth01: number, time: number, seconds: number): void {
+    for (const v of this.voices) v.setVibrato(depth01, time, seconds);
+  }
+
+  /** Continuous pitch for a sounding note (theremin, melody glide). */
+  pitchNote(id: string, note: Midi, time: number, glide: number): void {
+    const v = this.notes.get(id);
+    if (v) v.glide(note, time, glide);
   }
 
   setSpread(scale: number, time: number, seconds: number): void {

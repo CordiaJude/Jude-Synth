@@ -6,6 +6,7 @@ import type { WorkerSettings } from '../vision/protocol';
 import { VisionClient } from '../vision/visionClient';
 import { live } from './live';
 import { ensureAudio, stopAudio } from './music';
+import type { Calibration } from '../gestures/types';
 import { useApp, type TrackingSettings } from './store';
 
 let stream: MediaStream | null = null;
@@ -84,6 +85,9 @@ async function openCamera(video: HTMLVideoElement): Promise<void> {
     },
   });
   await client.start(stream, video, workerSettings(app.tracking), app.tracking.preferGpu);
+  client.setCalibration(useApp.getState().calibration);
+  // First run (no saved calibration): walk the user through it.
+  if (!useApp.getState().calibration) useApp.getState().setCalibrating(true);
   unsubscribeSettings = useApp.subscribe((s, prev) => {
     if (s.tracking !== prev.tracking) client?.updateSettings(workerSettings(s.tracking));
   });
@@ -92,6 +96,20 @@ async function openCamera(video: HTMLVideoElement): Promise<void> {
 /** Ask the worker to include unfiltered landmarks (capture tool). */
 export function setCaptureRaw(enabled: boolean): void {
   client?.updateSettings({ captureRaw: enabled });
+}
+
+/** Play with keyboard / touch only — no camera at all. */
+export function startManual(): void {
+  void ensureAudio();
+  live.reset();
+  useApp.getState().setVision(null);
+  useApp.getState().setPhase('running', 'manual');
+}
+
+/** Save (or clear) the user's calibration and apply it to the running recognizer. */
+export function applyCalibration(calibration: Calibration | null): void {
+  useApp.getState().setCalibration(calibration);
+  client?.setCalibration(calibration);
 }
 
 export function startDemo(): void {
@@ -115,5 +133,6 @@ export function stopSession(): void {
   stream = null;
   live.reset();
   useApp.getState().setVision(null);
+  useApp.getState().setCalibrating(false);
   useApp.getState().setPhase('landing', null);
 }

@@ -1,6 +1,7 @@
 import type { ChordTransition } from '../../events/types';
 
-export type InstrumentId = 'supersawPad' | 'warmPoly' | 'subBass' | 'testSine';
+export type InstrumentId =
+  'supersawPad' | 'warmPoly' | 'subBass' | 'fmKeys' | 'pluck' | 'glassBell' | 'thereminLead' | 'testSine';
 export type MacroId = 'brightness' | 'space' | 'motion' | 'grit';
 
 export interface Adsr {
@@ -55,4 +56,18 @@ export interface Patch {
   level: number;
   /** Optional soft saturation on the voice output (0..1). */
   drive?: number;
+  /**
+   * FM operators: each is a sine modulator at `ratio` × the note frequency, modulating every oscillator's
+   * frequency with peak index `index` that decays (time constant ~decay/3) to `sustain` × index.
+   */
+  fm?: FmOperator[];
+  /** Per-voice vibrato LFO; depth is set at runtime (e.g. from hand tremor) up to maxCents. */
+  vibrato?: { rate: number; maxCents: number };
+}
+
+export interface FmOperator {
+  ratio: number;
+  index: number;
+  decay: number;
+  sustain: number;
 }

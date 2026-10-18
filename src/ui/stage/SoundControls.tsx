@@ -1,6 +1,7 @@
-import { CHORD_INSTRUMENTS } from '../../audio/instruments/patches';
+import { CHORD_INSTRUMENTS, MELODY_INSTRUMENTS } from '../../audio/instruments/patches';
 import type { InstrumentId } from '../../audio/instruments/types';
-import { useMusic } from '../../state/music';
+import { getPreset, useMusic } from '../../state/music';
+import { allPresets, usePresets } from '../../state/presets';
 import { MODE_LABEL, MODES, prefersFlats, type Mode } from '../../theory/modes';
 import { pitchName, type PitchClass } from '../../theory/notes';
 import styles from './Stage.module.css';
@@ -8,62 +9,66 @@ import styles from './Stage.module.css';
 const TONICS = Array.from({ length: 12 }, (_, i) => i as PitchClass);
 
 export function SoundControls() {
-  const { status, muted, tonic, mode, instrument, bass, setKey, setInstrument, setBass, setMuted } =
-    useMusic();
-  const flats = prefersFlats({ tonic, mode });
+  const m = useMusic();
+  const { userPresets, activeId, select } = usePresets();
+  const flats = prefersFlats({ tonic: m.tonic, mode: m.mode });
+  const usesMelody = m.performanceMode !== 'chords';
+  const usesChords = m.performanceMode !== 'theremin';
+  const statusLabel =
+    m.status === 'on'
+      ? m.muted
+        ? 'Sound off'
+        : 'Sound on'
+      : m.status === 'starting'
+        ? 'Starting…'
+        : m.status === 'error'
+          ? 'Audio error'
+          : 'Sound off';
   return (
     <div className={styles.soundControls} role="group" aria-label="Sound settings">
-      <button
-        className={styles.btn}
-        aria-pressed={!muted && status === 'on'}
-        onClick={() => setMuted(!muted)}
-        disabled={status !== 'on'}
-        title={status === 'error' ? (useMusic.getState().error ?? '') : undefined}
+      <select
+        aria-label="Preset"
+        className={styles.select}
+        value={activeId}
+        onChange={(e) => select(e.target.value)}
+        title={getPreset().description}
       >
-        {status === 'on'
-          ? muted
-            ? 'Sound off'
-            : 'Sound on'
-          : status === 'starting'
-            ? 'Starting…'
-            : status === 'error'
-              ? 'Audio error'
-              : 'Sound off'}
-      </button>
-      <label className={styles.selectWrap}>
-        <span className="sr-only">Key</span>
+        {allPresets(userPresets).map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label="Key"
+        className={styles.select}
+        value={m.tonic}
+        onChange={(e) => m.setKey(Number(e.target.value) as PitchClass, m.mode)}
+      >
+        {TONICS.map((t) => (
+          <option key={t} value={t}>
+            {pitchName(t, flats)}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label="Mode"
+        className={styles.select}
+        value={m.mode}
+        onChange={(e) => m.setKey(m.tonic, e.target.value as Mode)}
+      >
+        {MODES.map((mode) => (
+          <option key={mode} value={mode}>
+            {MODE_LABEL[mode]}
+          </option>
+        ))}
+      </select>
+      {usesChords && (
         <select
+          aria-label="Chord instrument"
           className={styles.select}
-          value={tonic}
-          onChange={(e) => setKey(Number(e.target.value) as PitchClass, mode)}
-        >
-          {TONICS.map((t) => (
-            <option key={t} value={t}>
-              {pitchName(t, flats)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className={styles.selectWrap}>
-        <span className="sr-only">Mode</span>
-        <select
-          className={styles.select}
-          value={mode}
-          onChange={(e) => setKey(tonic, e.target.value as Mode)}
-        >
-          {MODES.map((m) => (
-            <option key={m} value={m}>
-              {MODE_LABEL[m]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className={styles.selectWrap}>
-        <span className="sr-only">Instrument</span>
-        <select
-          className={styles.select}
-          value={instrument}
-          onChange={(e) => setInstrument(e.target.value as InstrumentId)}
+          value={m.chordInstrument}
+          onChange={(e) => m.setChordInstrument(e.target.value as InstrumentId)}
         >
           {CHORD_INSTRUMENTS.map((p) => (
             <option key={p.id} value={p.id}>
@@ -71,26 +76,60 @@ export function SoundControls() {
             </option>
           ))}
         </select>
-      </label>
-      <button className={styles.btn} aria-pressed={bass} onClick={() => setBass(!bass)}>
+      )}
+      {usesMelody && (
+        <select
+          aria-label="Melody instrument"
+          className={styles.select}
+          value={m.melodyInstrument}
+          onChange={(e) => m.setMelodyInstrument(e.target.value as InstrumentId)}
+        >
+          {MELODY_INSTRUMENTS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      )}
+      <button className={styles.btn} aria-pressed={m.bass} onClick={() => m.setBass(!m.bass)}>
         Bass
+      </button>
+      <button
+        className={styles.btn}
+        aria-pressed={!m.muted && m.status === 'on'}
+        onClick={() => m.setMuted(!m.muted)}
+        disabled={m.status !== 'on'}
+        title={m.status === 'error' ? (m.error ?? '') : undefined}
+      >
+        {statusLabel}
       </button>
     </div>
   );
 }
 
 export function ChordDisplay() {
-  const chord = useMusic((s) => s.chord);
-  const tonic = useMusic((s) => s.tonic);
-  const mode = useMusic((s) => s.mode);
+  const { chord, tonic, mode, melodyNote, latched, performanceMode } = useMusic();
   const keyName = `${pitchName(tonic, prefersFlats({ tonic, mode }))} ${MODE_LABEL[mode]}`;
+  const showChord = performanceMode !== 'theremin';
   return (
     <div className={styles.chord} aria-live="polite" aria-atomic="true">
-      <div className={styles.chordName} data-empty={!chord}>
-        {chord?.name ?? '—'}
+      {showChord ? (
+        <>
+          <div className={styles.chordName} data-empty={!chord}>
+            {chord?.name ?? '—'}
+          </div>
+          <div className={styles.chordRoman}>{chord?.roman ?? ' '}</div>
+        </>
+      ) : (
+        <div className={styles.chordName} data-empty={!melodyNote}>
+          {melodyNote ?? '—'}
+        </div>
+      )}
+      <div className={styles.chordKey}>
+        {keyName}
+        {latched && <span className={styles.latch}> · LATCHED</span>}
+        {showChord && performanceMode === 'melody' && melodyNote && <span> · melody {melodyNote}</span>}
       </div>
-      <div className={styles.chordRoman}>{chord?.roman ?? ' '}</div>
-      <div className={styles.chordKey}>{keyName}</div>
     </div>
   );
 }
