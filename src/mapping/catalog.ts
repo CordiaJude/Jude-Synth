@@ -82,6 +82,7 @@ export const TARGET_LABEL: Record<MappingTarget, string> = {
   'melody.pitch': 'Melody pitch',
   'fx.duck': 'Sidechain ducking (on kicks)',
   'drums.level': 'Drum level',
+  'loops.level': 'Looper level',
   'arp.rate': 'Arpeggio rate',
   'arp.gate': 'Arpeggio note length',
   'strum.position': 'Strum (hand sweeps across strings)',
@@ -148,6 +149,10 @@ export const ACTION_CHOICES: Array<{ label: string; action: Action }> = [
   { label: 'Tap tempo', action: { type: 'tempo.tap' } },
   { label: 'Tempo +5', action: { type: 'tempo.nudge', delta: 5 } },
   { label: 'Tempo −5', action: { type: 'tempo.nudge', delta: -5 } },
+  { label: 'Looper: record / overdub', action: { type: 'looper.recordToggle' } },
+  { label: 'Looper: play / stop', action: { type: 'looper.playToggle' } },
+  { label: 'Looper: undo', action: { type: 'looper.undo' } },
+  { label: 'Looper: redo', action: { type: 'looper.redo' } },
 ];
 
 export const actionLabel = (a: Action | undefined): string =>

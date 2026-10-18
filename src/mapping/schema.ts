@@ -68,6 +68,10 @@ const action = z.discriminatedUnion('type', [
   z.object({ type: z.literal('bass.nextPattern') }),
   z.object({ type: z.literal('tempo.tap') }),
   z.object({ type: z.literal('tempo.nudge'), delta: z.number().min(-40).max(40) }),
+  z.object({ type: z.literal('looper.recordToggle') }),
+  z.object({ type: z.literal('looper.playToggle') }),
+  z.object({ type: z.literal('looper.undo') }),
+  z.object({ type: z.literal('looper.redo') }),
 ]);
 const trigger = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('pose'), role, pose }),

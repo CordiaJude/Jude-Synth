@@ -1,6 +1,7 @@
 // Touch / mouse fallback: degree pads, chord shapes, and a melody strip. Same Actions as the hands.
 
 import { useRef, useState } from 'react';
+import { useLooper } from '../../state/looper';
 import { conductorSnapshot, perform, useGroove, useMusic } from '../../state/music';
 import { diatonicChords, type Degree, type Extension } from '../../theory/chords';
 import type { ChordQuality } from '../../theory/chords';
@@ -22,6 +23,9 @@ export function TouchPad() {
   const chords = diatonicChords({ tonic, mode });
   const current = conductorSnapshot().degree;
   const groove = useGroove();
+  const loopRec = useLooper((s) => s.rec);
+  const loopPlaying = useLooper((s) => s.playing);
+  const hasLoop = useLooper((s) => s.project.tracks.length > 0);
 
   const play = (degree: Degree) =>
     perform(
@@ -132,6 +136,23 @@ export function TouchPad() {
               disabled={!groove.drums}
             >
               Style
+            </button>
+          </div>
+          <div className={styles.row} role="group" aria-label="Looper">
+            <button
+              className={styles.small}
+              aria-pressed={loopRec !== 'off'}
+              onClick={() => perform([{ type: 'looper.recordToggle' }], [])}
+            >
+              {loopRec === 'off' ? '● Rec' : loopRec === 'countIn' ? '● Count-in…' : '● Recording'}
+            </button>
+            <button
+              className={styles.small}
+              aria-pressed={loopPlaying}
+              disabled={!hasLoop && loopRec === 'off'}
+              onClick={() => perform([{ type: 'looper.playToggle' }], [])}
+            >
+              {loopPlaying ? '■ Stop loop' : '▶ Play loop'}
             </button>
           </div>
         </div>

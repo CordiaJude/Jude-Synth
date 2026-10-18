@@ -7,6 +7,7 @@
 //   Z X C V B N M , . /   melody: scale degrees 1–10 (held = sounding)
 //   A arp · S strum (Shift: up) · D drums · F fill · G drop · H next drum style · J next bass pattern
 //   T tap tempo · − / = tempo down / up
+//   O looper record / overdub · P looper play / stop  (Ctrl/⌘ + Z / Shift + Z: undo / redo, in useKeyboardInput)
 
 import type { Action, ParamUpdate } from '../mapping/types';
 import { scaleOf, type Key } from '../theory/modes';
@@ -156,6 +157,12 @@ export function handleKey(e: KeyInput, ctx: KeyboardContext, held: Set<string>):
     case 'Equal':
       out.actions.push({ type: 'tempo.nudge', delta: e.code === 'Equal' ? 5 : -5 });
       return out;
+    case 'KeyO':
+      out.actions.push({ type: 'looper.recordToggle' });
+      return out;
+    case 'KeyP':
+      out.actions.push({ type: 'looper.playToggle' });
+      return out;
     default:
       return null;
   }
@@ -175,4 +182,7 @@ export const KEYBOARD_HELP: Array<[string, string]> = [
   ['D · F · G', 'Drums on / off · fill · drop'],
   ['H · J', 'Next drum style · next bass pattern'],
   ['T · − =', 'Tap tempo · tempo down / up'],
+  ['O', 'Looper: record (again: close the loop / overdub)'],
+  ['P', 'Looper: play / stop'],
+  ['Ctrl/⌘ + Z', 'Looper: undo (Shift: redo)'],
 ];

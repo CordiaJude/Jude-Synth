@@ -17,10 +17,13 @@ data ever leaves the browser (enforced by a `connect-src 'self'` Content-Securit
 - **Phase 3 — mapping & UX:** a declarative gesture → music mapping layer with four presets
   and a live editor, four more instruments (FM Keys, Pluck, Glass Bell, Theremin Lead with tremor vibrato),
   10-second calibration, keyboard and touch play (no camera needed), accessibility settings.
-- **Phase 4 — performance tools (this build):** tempo-synced arpeggiator, strum mode, auto-bass patterns,
+- **Phase 4 — performance tools:** tempo-synced arpeggiator, strum mode, auto-bass patterns,
   a synthesized drum machine (lofi / house / trap / synthwave) with fills, drops and sidechain ducking,
   a quantize engine (off · 1/8 · 1/16 · 1/16T, strength, humanize), predictive onset, and an end-to-end
   latency breakdown in the debug panel.
+- **Phase 5 — looper & export (this build):** an event-based 8-track looper (count-in, overdub,
+  undo/redo, mute/solo, per-track instrument and level, post-recording quantize), a piano roll editor, Web
+  MIDI out, `.mid` export, and offline WAV export of the mix and stems.
 
 ## Run it locally
 
@@ -39,7 +42,7 @@ Other scripts:
 
 | Command | What it does |
 |---|---|
-| `pnpm test` | Unit tests (Vitest): theory, voice leading, Classic preset, DSP cores, click detectors, filter, tracker, poses, features, events, calibration |
+| `pnpm test` | Unit tests (Vitest): theory, voice leading, presets, DSP cores, click detectors, filter, tracker, poses, features, events, calibration, groove timing, looper (record, playback, edits, history), `.mid` / WAV / zip writers, MIDI out |
 | `pnpm e2e` | Builds, serves the production bundle, runs Playwright in Chromium with a fake webcam, plus the offline-render click tests |
 | `pnpm typecheck` / `pnpm lint` | Strict TypeScript / ESLint |
 | `pnpm build && pnpm preview` | Production build served with the real CSP headers |
@@ -78,6 +81,8 @@ Choose **Play with keyboard / touch** on the start page (or enable the touch pad
 | `D` · `F` · `G` | drums on/off · fill · drop |
 | `H` · `J` | next drum style · next bass pattern |
 | `T` · `-` `=` | tap tempo · tempo −5 / +5 |
+| `O` · `P` | looper: record (press again to close the loop / end an overdub) · play / stop |
+| `Ctrl`/`⌘` + `Z` (+ `Shift`) | looper undo (redo) |
 
 The touch pad has the seven degree pads (labelled with Roman numeral and chord name), shapes, borrow,
 latch and release, plus a melody strip for the melody/theremin presets.
@@ -97,6 +102,53 @@ moves are never quantized.
 All patterns are pure functions of the transport and are scheduled 80 ms ahead on the audio clock, so a
 pattern is identical however the scheduler slices time (tested). Note: browsers throttle timers in
 background tabs, so keep the tab visible while playing.
+
+## Looper
+
+Open **Looper**. Press **Record** (or `O`), play, and press it again: the loop closes on the nearest bar
+line and starts playing straight away. (Or pick a fixed length — 1, 2, 4 or 8 bars — and it closes by
+itself.) With nothing rhythmic running, the count-in (none, 1 or 2 bars, with a click) starts at once;
+with drums or a loop playing, recording starts on the next bar. Each part you played — chords, melody,
+bass, drums — becomes its own track with the instrument it was played on; if you recorded the drums,
+the live drum machine hands them to the loop instead of doubling them.
+
+Press **Overdub** while the loop plays to record one more pass round it, into new tracks or merged into
+the same ones. Every track has an instrument (change it any time), mute, solo, level, delete and
+**Quantize** (1/4 … 1/32, with strength; recorded notes move to the *nearest* line). Undo/redo covers
+takes, edits, quantizing and deleting (`Ctrl`/`⌘` + `Z`). Up to 8 tracks. The loop is saved in this browser
+and comes back after a reload.
+
+The loop is stored as notes, not audio, so it follows tempo changes and can be edited:
+
+- **Piano roll** (✎ on a track): drag notes (snapped), drag a note's right edge to change its length,
+  double-click to add one, `Delete` to remove. Keyboard: `[` `]` select notes, arrows move them,
+  `Shift` + `←` `→` change length, `Shift` + `↑` `↓` move an octave. Each drag or key press is one undo step.
+- Chords play back as voicings, so the instrument voice-leads exactly as it did live; theremin glides,
+  brightness moves and vibrato are recorded too.
+
+### Export
+
+- **MIDI (.mid):** Standard MIDI File, type 1: tempo, time and key signature, then one track per loop
+  track with its name and closest General MIDI program. Drums are on channel 10, glides are pitch bends
+  (±12 semitones), brightness is CC 74. Notes that wrap past the loop end are split, so the file loops
+  seamlessly in a DAW.
+- **Mix (.wav) / Stems (.zip):** rendered offline through the same engine — sample-accurate, faster than
+  real time, no dropouts — at 48 kHz, 24-bit (or 16-bit with dither), 1–8 times through, plus 3 s of tail.
+  Stems are separate renders, each with its own reverb tails.
+
+**Offline render equals live playback, verified.** `pnpm e2e` renders a scripted performance (voice-led
+chords, patterned bass, a melody with glides, drums) through the engine, records it with the looper, renders
+the loop through the export path and compares them sample by sample: they differ by −77 dB, which is the
+same as two renders of the *same* live events differ from each other (float rounding in resonant filters;
+rendered dry, the drum track is sample-exact). The unit tests check the same performance event for event, and that
+a recorded loop written to `.mid` reads back (with an independent parser) with every note intact.
+
+## MIDI out
+
+**Settings → MIDI out** sends everything you play — and everything the looper plays — to a MIDI port (a
+DAW or a hardware synth), in time with the audio. Channels: chords 1, melody 2, bass 3, loop tracks 4–9 and
+11–12, drums 10 — or everything on one channel. The browser asks for MIDI permission when you switch it on.
+Safari has no Web MIDI; there the panel says so (`.mid` export still works).
 
 ## Latency
 

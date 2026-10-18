@@ -88,6 +88,11 @@ describe('keyboard fallback', () => {
     });
   });
 
+  it('O and P drive the looper', () => {
+    expect(handleKey(down('KeyO'), ctx, new Set())!.actions).toEqual([{ type: 'looper.recordToggle' }]);
+    expect(handleKey(down('KeyP'), ctx, new Set())!.actions).toEqual([{ type: 'looper.playToggle' }]);
+  });
+
   it('octave and inversion keys are bounded', () => {
     let c = ctx;
     for (let i = 0; i < 4; i++) c = handleKey(down('ArrowUp'), c, new Set())!.context;

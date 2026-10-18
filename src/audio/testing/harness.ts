@@ -11,6 +11,13 @@ import { AudioEngine, type EngineOptions } from '../engine';
 import { voiceDebug } from '../voice';
 import type { InstrumentId, Patch } from '../instruments/types';
 import { detectSineClicks, detectTransientClicks, type ClickReport } from './clickDetect';
+import { renderLength, renderTracks, RENDER_START } from '../../export/offlineRender';
+import { encodeWav } from '../../export/wav';
+import { audibleTracks, emptyProject, loopTicks, PPQ, type LoopProject } from '../../looper/model';
+import { compareEvents } from '../../looper/player';
+import { buildTake, isLiveEvent, LiveTracker, placeTake } from '../../looper/recorder';
+import { scriptedPerformance } from '../../looper/testing/performance';
+import { beatAt } from '../../performance/transport';
 
 const SR = 48000;
 
@@ -540,6 +547,121 @@ export async function runPositiveControl(): Promise<{ sine: number; transient: n
   };
 }
 
+export interface LoopEquivalence {
+  seconds: number;
+  tracks: string[];
+  liveEvents: number;
+  /** Largest per-sample difference between the live render and the loop render. */
+  maxDiff: number;
+  /** Energy of the difference relative to the signal (dB; −Infinity = identical). */
+  residualDb: number;
+  peakDb: number;
+  rmsDb: number;
+  nonFinite: number;
+}
+
+/**
+ * "Offline render equals live playback": render a live performance through the engine, record it with the
+ * looper, render the loop through the export path, and compare the two sample by sample.
+ */
+export async function runLoopEquivalence(
+  only?: string,
+  fx = true,
+  selfTest = false,
+): Promise<LoopEquivalence> {
+  const perf = scriptedPerformance({ origin: RENDER_START, glide: true });
+  const startBeat = beatAt(perf.transport, perf.start);
+  const take = buildTake(new LiveTracker(), perf.events, perf.start, perf.end, (t) =>
+    Math.round((beatAt(perf.transport, t) - startBeat) * PPQ),
+  );
+  const empty: LoopProject = { ...emptyProject(perf.transport.bpm, perf.key), bars: perf.bars };
+  const full = placeTake(empty, take, {
+    loopLength: loopTicks(empty),
+    offset: 0,
+    mode: 'new',
+    instruments: { chords: 'warmPoly', melody: 'thereminLead', bass: 'subBass', drums: 'drums' },
+  }).project;
+  // Optionally just one part (for narrowing down a difference).
+  const project = only ? { ...full, tracks: full.tracks.filter((t) => t.part === only) } : full;
+  const partOf = (e: MusicEvent) => (e.kind === 'drum' ? 'drums' : 'slot' in e ? e.slot : null);
+  const seconds = renderLength(project, 1, 3);
+  const params: Array<[ParamPath, number]> = [['fx.duck', 0.35]];
+  const live = perf.events
+    .filter(isLiveEvent)
+    .filter((e) => !only || partOf(e) === only || e.kind === 'param')
+    .sort(compareEvents);
+  const a = await render(
+    seconds,
+    { chords: 'warmPoly', melody: 'thereminLead', bass: 'subBass', fx, bpm: perf.transport.bpm },
+    (e) => {
+      for (const [p, v] of params) e.setParam(p, v, 0, 0.001);
+      for (const ev of live) e.schedule(ev);
+    },
+  );
+  const b = selfTest
+    ? await render(
+        seconds,
+        { chords: 'warmPoly', melody: 'thereminLead', bass: 'subBass', fx, bpm: perf.transport.bpm },
+        (e) => {
+          for (const [p, v] of params) e.setParam(p, v, 0, 0.001);
+          for (const ev of live) e.schedule(ev);
+        },
+      )
+    : (await renderTracks(project, audibleTracks(project), { params, tailSec: 3, sampleRate: SR, fx }))
+        .channels;
+  let maxDiff = 0;
+  let diffE = 0;
+  let sigE = 0;
+  let peak = 0;
+  let nonFinite = 0;
+  for (let c = 0; c < 2; c++) {
+    const x = a[c]!;
+    const y = b[c]!;
+    const n = Math.min(x.length, y.length);
+    for (let i = 0; i < n; i++) {
+      if (!Number.isFinite(x[i]!) || !Number.isFinite(y[i]!)) nonFinite++;
+      const d = Math.abs(x[i]! - y[i]!);
+      if (d > maxDiff) maxDiff = d;
+      diffE += d * d;
+      sigE += x[i]! * x[i]!;
+      peak = Math.max(peak, Math.abs(x[i]!));
+    }
+  }
+  return {
+    seconds,
+    tracks: project.tracks.map((t) => `${t.name} (${t.notes.length} notes)`),
+    liveEvents: live.length,
+    maxDiff,
+    residualDb: diffE > 0 ? 10 * Math.log10(diffE / sigE) : -Infinity,
+    peakDb: toDb(peak),
+    rmsDb: toDb(Math.sqrt(sigE / (2 * a[0]!.length))),
+    nonFinite,
+  };
+}
+
+/** Debug: the loop render of the scripted performance, as a 24-bit WAV (bytes). */
+export async function loopRenderWav(): Promise<number[]> {
+  const perf = scriptedPerformance({ origin: RENDER_START });
+  const startBeat = beatAt(perf.transport, perf.start);
+  const take = buildTake(new LiveTracker(), perf.events, perf.start, perf.end, (t) =>
+    Math.round((beatAt(perf.transport, t) - startBeat) * PPQ),
+  );
+  const empty: LoopProject = { ...emptyProject(perf.transport.bpm, perf.key), bars: perf.bars };
+  const project = placeTake(empty, take, {
+    loopLength: loopTicks(empty),
+    offset: 0,
+    mode: 'new',
+    instruments: { chords: 'supersawPad', melody: 'fmKeys', bass: 'subBass', drums: 'drums' },
+  }).project;
+  const r = await renderTracks(project, audibleTracks(project), {
+    cycles: 2,
+    tailSec: 3,
+    sampleRate: SR,
+    params: [['fx.duck', 0.35]],
+  });
+  return Array.from(encodeWav(r.channels, SR, 24));
+}
+
 declare global {
   interface Window {
     handwaveHarness: {
@@ -550,6 +672,8 @@ declare global {
       renderEvents: typeof renderEvents;
       scenarioEvents: typeof scenarioEvents;
       scenarioNames: typeof scenarioNames;
+      runLoopEquivalence: typeof runLoopEquivalence;
+      loopRenderWav: typeof loopRenderWav;
     };
   }
 }
@@ -561,5 +685,7 @@ window.handwaveHarness = {
   renderEvents,
   scenarioEvents,
   scenarioNames,
+  runLoopEquivalence,
+  loopRenderWav,
 };
 document.body.dataset.ready = 'true';

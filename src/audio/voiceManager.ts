@@ -23,7 +23,7 @@ export class VoiceManager {
 
   constructor(ctx: BaseContext, patch: Patch, destination: AudioNode) {
     this.patch = patch;
-    this.voices = Array.from({ length: patch.maxVoices }, () => new Voice(ctx, patch, destination));
+    this.voices = Array.from({ length: patch.maxVoices }, (_, i) => new Voice(ctx, patch, destination, i));
   }
 
   /** Pick a voice for a new note: a free one, else the quietest released one, else the oldest. */

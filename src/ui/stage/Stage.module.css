@@ -76,6 +76,13 @@
   color: var(--text);
   font-weight: 600;
 }
+.recChip {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.recChip strong {
+  color: var(--danger);
+}
 .spacer {
   flex: 1;
 }

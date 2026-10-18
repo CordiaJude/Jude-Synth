@@ -1,0 +1,184 @@
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.rec,
+.play {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+}
+.rec {
+  color: var(--danger);
+}
+.recOn {
+  background: var(--danger);
+  color: #111;
+  border-color: var(--danger);
+}
+.play[aria-pressed='true'] {
+  background: var(--accent);
+  color: #111;
+  border-color: var(--accent);
+}
+.rec:disabled,
+.play:disabled {
+  opacity: 0.45;
+}
+.position {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 16px;
+  color: var(--accent);
+}
+.message {
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  font-size: 12px;
+}
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
+}
+.grid3 > *,
+.quantize > * {
+  min-width: 0;
+}
+.grid3 select,
+.quantize select {
+  width: 100%;
+  min-width: 0;
+}
+.spaced {
+  margin-top: 10px;
+}
+.dim {
+  color: var(--text-faint);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.track {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  background: var(--bg);
+}
+.selected {
+  border-color: var(--accent);
+}
+.trackHead {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.trackName {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  padding: 4px 2px;
+  font-size: 13px;
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.part {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+  background: var(--primary);
+}
+.part[data-part='bass'] {
+  background: var(--secondary);
+}
+.part[data-part='melody'] {
+  background: #b197fc;
+}
+.part[data-part='drums'] {
+  background: #ced4da;
+}
+.count {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.toggle {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+.toggle[aria-pressed='true'] {
+  background: var(--accent);
+  color: #111;
+  border-color: var(--accent);
+}
+.trackBody {
+  display: grid;
+  grid-template-columns: 1fr 80px 56px;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.trackBody select {
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 3px 4px;
+  font-size: 12px;
+  min-width: 0;
+}
+.trackBody input {
+  accent-color: var(--accent);
+  width: 100%;
+}
+.fixed {
+  color: var(--text-dim);
+}
+.db {
+  font-family: var(--mono);
+  text-align: right;
+  font-size: 11px;
+}
+.quantize {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+  margin-top: 10px;
+}
+.quantize input {
+  accent-color: var(--accent);
+  width: 100%;
+}
+.quantize button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}

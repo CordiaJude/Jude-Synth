@@ -47,7 +47,10 @@ export class DrumKit {
     const src = this.ctx.createBufferSource();
     src.buffer = this.noise;
     src.loop = true;
-    src.start(time, Math.random() * 0.9);
+    // Start offset into the noise loop derived from the hit time: varied, but deterministic, so a loop
+    // played back renders exactly like the performance it was recorded from.
+    const offset = (((time * 7.31) % 1) + 1) % 1;
+    src.start(time, offset * 0.9);
     src.stop(stop);
     return src;
   }
@@ -62,6 +65,17 @@ export class DrumKit {
 
   private cleanup(nodes: AudioNode[], src: AudioScheduledSourceNode) {
     src.onended = () => nodes.forEach((n) => n.disconnect());
+  }
+
+  /** Metronome tick (not a kit voice: never recorded or sent to MIDI). */
+  click(time: number, accent: boolean): void {
+    const osc = this.ctx.createOscillator();
+    osc.frequency.value = accent ? 1760 : 1320;
+    const g = this.env(time, accent ? 0.32 : 0.2, 0.012);
+    osc.connect(g).connect(this.output);
+    osc.start(time);
+    osc.stop(time + 0.12);
+    this.cleanup([osc, g], osc);
   }
 
   trigger(voice: DrumVoice, velocity: number, time: number): void {

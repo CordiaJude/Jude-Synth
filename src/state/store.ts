@@ -24,7 +24,7 @@ export const DEFAULT_TRACKING: TrackingSettings = {
 };
 
 export type MotionPref = 'system' | 'reduce' | 'full';
-export type SidePanel = 'none' | 'debug' | 'mappings' | 'settings' | 'groove';
+export type SidePanel = 'none' | 'debug' | 'mappings' | 'settings' | 'groove' | 'looper';
 export type Palette = 'default' | 'highContrast';
 /** How the user plays: hands (camera), synthetic demo hands, or keyboard/touch only. */
 export type InputMode = 'camera' | 'demo' | 'manual';

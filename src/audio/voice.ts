@@ -2,6 +2,7 @@
 // amp envelope and pitch changes are phase-continuous frequency glides — so a voice can never click.
 
 import type { BaseContext } from 'tone';
+import { mulberry32 } from '../gestures/testing/synthetic';
 import { midiToFreq, type Midi } from '../theory/notes';
 import type { Patch } from './instruments/types';
 import { glideTo, MIN_TAU } from './params';
@@ -47,8 +48,12 @@ export class Voice {
     private ctx: BaseContext,
     patch: Patch,
     destination: AudioNode,
+    /** Seeds the voice's small random variations (oscillator phases, vibrato rate): deterministic, so a
+     * re-render (WAV export, a loop played back) matches the original exactly. */
+    seed = 0,
   ) {
     this.patch = patch;
+    const rng = mulberry32(0x9e3779b1 ^ (seed * 7919 + 1));
     this.output = ctx.createGain();
     this.output.gain.value = 1;
     this.vca = ctx.createGain();
@@ -94,7 +99,7 @@ export class Voice {
     if (patch.vibrato) {
       const lfo = ctx.createOscillator();
       lfo.type = 'sine';
-      lfo.frequency.value = patch.vibrato.rate * (0.95 + Math.random() * 0.1);
+      lfo.frequency.value = patch.vibrato.rate * (0.95 + rng() * 0.1);
       const depth = ctx.createGain();
       depth.gain.value = 0;
       lfo.connect(depth);
@@ -116,7 +121,7 @@ export class Voice {
     this.output.connect(destination);
     // Random start offsets → random relative phases between detuned oscillators (no phasey attack).
     const t = ctx.currentTime;
-    this.oscs.forEach((o, i) => o.start(t + (i === 0 ? 0 : Math.random() * 0.01)));
+    this.oscs.forEach((o, i) => o.start(t + (i === 0 ? 0 : rng() * 0.01)));
     for (const op of this.fm) op.osc.start(t);
     this.vibrato?.lfo.start(t);
   }

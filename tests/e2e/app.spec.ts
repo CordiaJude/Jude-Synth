@@ -50,7 +50,7 @@ test('demo mode recognizes synthetic poses without a camera', async ({ page }) =
   await expect(page.getByText('C Major (Ionian)', { exact: false }).first()).toBeVisible();
 });
 
-test('camera pipeline runs in a worker without blocking the main thread', async ({ page }) => {
+test('camera pipeline runs in a worker without blocking the main thread @perf', async ({ page }) => {
   const external = guardNetwork(page);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));

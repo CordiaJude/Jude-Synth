@@ -17,5 +17,20 @@ interface Window {
     runClickSuite(): Promise<HarnessScenarioResult[]>;
     runPositiveControl(): Promise<{ sine: number; transient: number }>;
     runBrokenVoiceControl(): Promise<HarnessScenarioResult>;
+    runLoopEquivalence(
+      only?: string,
+      fx?: boolean,
+      selfTest?: boolean,
+    ): Promise<{
+      seconds: number;
+      tracks: string[];
+      liveEvents: number;
+      maxDiff: number;
+      residualDb: number;
+      peakDb: number;
+      rmsDb: number;
+      nonFinite: number;
+    }>;
+    loopRenderWav(): Promise<number[]>;
   };
 }

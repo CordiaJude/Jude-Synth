@@ -11,7 +11,14 @@ import type { InstrumentId } from '../audio/instruments/types';
 import { EventBus } from '../events/bus';
 import type { EventCause, MusicEvent } from '../events/types';
 import { createMappingState, evaluateMapping, type MappingState } from '../mapping/evaluate';
-import type { Action, MappingPreset, ParamUpdate, PerformanceMode } from '../mapping/types';
+import {
+  LOOPER_ACTION_TYPES,
+  type Action,
+  type LooperAction,
+  type MappingPreset,
+  type ParamUpdate,
+  type PerformanceMode,
+} from '../mapping/types';
 import type { ArpSettings } from '../performance/arp';
 import type { BassPattern } from '../performance/bass';
 import {
@@ -38,7 +45,7 @@ import {
   type GrooveTarget,
 } from '../performance/groove';
 import { LATENCY_STAGES, latencyStages, type LatencyStage } from '../performance/latency';
-import { quantizeTime, setTempo, type QuantizeSettings } from '../performance/transport';
+import { quantizeTime, setTempo, type QuantizeSettings, type Transport } from '../performance/transport';
 import type { Mode } from '../theory/modes';
 import { noteName, type PitchClass } from '../theory/notes';
 import { wallNow } from '../vision/types';
@@ -152,6 +159,7 @@ export const useMusic = create<MusicState>()((set, get) => ({
     engine.setParam('chords.level', muted ? 0 : 1, t, 0.15);
     engine.setParam('melody.level', muted ? 0 : 1, t, 0.15);
     engine.setParam('drums.level', muted ? 0 : 1, t, 0.15);
+    engine.setParam('loops.level', muted ? 0 : 1, t, 0.15);
     engine.setParam('bass.level', muted || !get().bass ? 0 : 1, t, 0.15);
   },
 }));
@@ -248,6 +256,38 @@ function syncConductorUi() {
 
 const QUANTIZED_KINDS = new Set(['chord', 'noteOn', 'noteOff']);
 
+// ---- hooks for the looper (it lives in its own module and plugs in here) --------------------------------
+
+type TickHook = (now: number, from: number, to: number) => void;
+const tickHooks = new Set<TickHook>();
+let looperActions: ((a: LooperAction) => void) | null = null;
+const stopHooks = new Set<() => void>();
+
+/** Run on every scheduler tick with the window being scheduled ([from, to) may be empty). */
+export function onSchedulerTick(fn: TickHook): () => void {
+  tickHooks.add(fn);
+  return () => tickHooks.delete(fn);
+}
+export function setLooperActionHandler(fn: (a: LooperAction) => void): void {
+  looperActions = fn;
+}
+/** Run when the session stops (everything goes quiet). */
+export function onSessionStop(fn: () => void): () => void {
+  stopHooks.add(fn);
+  return () => stopHooks.delete(fn);
+}
+
+/** The shared transport (tempo + where beat 0 is) and whether anything rhythmic is running on it. */
+export const transport = {
+  get: (): Transport => groove.transport,
+  /** Move beat 0 to `origin` (only when nothing rhythmic is playing — see busy()). */
+  reanchor: (origin: number): void => {
+    groove = { ...groove, transport: { ...groove.transport, origin } };
+  },
+  busy: (): boolean => groove.drums.enabled || groove.arp.enabled || groove.bassPattern !== 'sustain',
+  liveDrums: (): boolean => groove.drums.enabled,
+};
+
 /**
  * Feed actions/params in (keyboard, touch, and gestures all come through here). Harmony/melody go to the
  * conductor, rhythm controls to the groove; discrete musical events are quantized if the user asked for it.
@@ -260,8 +300,11 @@ export function perform(
   if (!engine) return;
   const scheduledAt = wallNow();
   const t0 = engine.now() + LIVE_LOOKAHEAD;
+  for (const a of actions) if (LOOPER_ACTION_TYPES.has(a.type)) looperActions?.(a as LooperAction);
   const grooveActions = actions.filter((a) => GROOVE_ACTION_TYPES.has(a.type)) as GrooveAction[];
-  const conductorActions = actions.filter((a) => !GROOVE_ACTION_TYPES.has(a.type));
+  const conductorActions = actions.filter(
+    (a) => !GROOVE_ACTION_TYPES.has(a.type) && !LOOPER_ACTION_TYPES.has(a.type),
+  );
   const qt = conductorActions.length ? quantizeTime(t0, groove.transport, groove.quantize, t0) : t0;
 
   const r = conduct(conductor, { actions: conductorActions, params, cause }, t0, settings());
@@ -347,7 +390,8 @@ function tick() {
   if (!engine) return;
   const now = engine.now();
   const from = Math.max(scheduledUntil, now);
-  const to = now + HORIZON;
+  const to = Math.max(from, now + HORIZON);
+  for (const hook of tickHooks) hook(now, from, to);
   if (to <= from) return;
   const events = grooveWindow(groove, from, to);
   scheduledUntil = to;
@@ -515,6 +559,7 @@ export function releaseAll(): void {
 
 export function stopAudio(): void {
   releaseAll();
+  for (const fn of stopHooks) fn();
   stopScheduler();
   unsubscribeLive?.();
   unsubscribeLive = null;

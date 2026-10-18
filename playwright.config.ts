@@ -10,6 +10,15 @@ const chromiumArgs = [
   ...(fakeVideo ? [`--use-file-for-fake-video-capture=${fakeVideo}`] : []),
 ];
 
+const chromium = {
+  ...devices['Desktop Chrome'],
+  launchOptions: {
+    args: chromiumArgs,
+    // Use a preinstalled Chromium when the bundled one isn't downloaded (e.g. sandboxed CI images).
+    executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined,
+  },
+};
+
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
@@ -29,14 +38,11 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        launchOptions: {
-          args: chromiumArgs,
-          // Use a preinstalled Chromium when the bundled one isn't downloaded (e.g. sandboxed CI images).
-          executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined,
-        },
-      },
+      // Timing benchmarks (@perf) run on their own afterwards: offline audio renders in parallel workers
+      // would otherwise compete for the same CPU and skew the main-thread measurements.
+      grepInvert: /@perf/,
+      use: chromium,
     },
+    { name: 'perf', grep: /@perf/, dependencies: ['chromium'], fullyParallel: false, use: chromium },
   ],
 });

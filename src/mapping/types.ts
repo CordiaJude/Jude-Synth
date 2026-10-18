@@ -97,7 +97,22 @@ export type Action =
   | { type: 'melody.octave'; delta: -1 | 1 }
   | { type: 'mode.set'; mode: PerformanceMode }
   | { type: 'latch.toggle' }
-  | GrooveAction;
+  | GrooveAction
+  | LooperAction;
+
+/** Looper transport — handled by the looper, not the conductor. */
+export type LooperAction =
+  | { type: 'looper.recordToggle' }
+  | { type: 'looper.playToggle' }
+  | { type: 'looper.undo' }
+  | { type: 'looper.redo' };
+
+export const LOOPER_ACTION_TYPES: ReadonlySet<string> = new Set([
+  'looper.recordToggle',
+  'looper.playToggle',
+  'looper.undo',
+  'looper.redo',
+]);
 
 export interface DiscreteMapping {
   id: string;

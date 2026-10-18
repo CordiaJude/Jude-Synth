@@ -7,7 +7,13 @@
 //                            └► reverb send ► reverb ───┘
 
 import * as Tone from 'tone';
-import type { InstrumentSlot, MusicEvent, ParamPath } from '../events/types';
+import {
+  isLoopSlot,
+  type InstrumentSlot,
+  type MusicEvent,
+  type ParamPath,
+  type SlotRef,
+} from '../events/types';
 import { DrumKit } from './drums';
 import { Ducker } from './fx/ducker';
 import { Reverb } from './fx/reverb';
@@ -43,6 +49,11 @@ export const LIVE_LOOKAHEAD = 0.012;
 
 type Slot = { manager: VoiceManager; gain: GainNode; id: InstrumentId };
 export type SlotName = 'chords' | 'bass' | 'melody';
+/** Which live part a looper track was recorded from; decides where in the mix it plays. */
+export type TrackPart = 'chords' | 'melody' | 'bass' | 'drums';
+type Track = { part: TrackPart; gain: GainNode; slot: Slot | null; kit: DrumKit | null };
+
+const dbToGain = (db: number) => (db <= -60 ? 0 : Math.pow(10, db / 20));
 
 export class AudioEngine {
   readonly ctx: Tone.BaseContext;
@@ -51,6 +62,9 @@ export class AudioEngine {
   private drums: DrumKit;
   private drumsGain: GainNode;
   private slots: Partial<Record<InstrumentSlot, Slot>> = {};
+  /** Looper tracks, each with its own instrument and level, feeding the looper bus. */
+  private tracks = new Map<string, Track>();
+  private loopBus: Record<TrackPart, GainNode>;
   private slotInputs: Record<SlotName, AudioNode>;
   private djLow: BiquadFilterNode;
   private djHigh: BiquadFilterNode;
@@ -118,6 +132,17 @@ export class AudioEngine {
     this.drumsGain = ctx.createGain();
     this.drums.output.connect(this.drumsGain);
     this.slotInputs = { chords: chordsIn, bass: bassIn, melody: melodyIn };
+    // Looper tracks join the mix at the same points as the live part they were recorded from.
+    this.loopBus = {
+      chords: ctx.createGain(),
+      melody: ctx.createGain(),
+      bass: ctx.createGain(),
+      drums: ctx.createGain(),
+    };
+    this.loopBus.chords.connect(chordsIn);
+    this.loopBus.melody.connect(melodyIn);
+    this.loopBus.bass.connect(bassIn);
+    this.loopBus.drums.connect(this.drumsGain);
 
     const afterTape: AudioNode = this.tape ?? preFx;
     if (this.tape) preFx.connect(this.tape);
@@ -240,8 +265,85 @@ export class AudioEngine {
     this.slots[slot] = { manager, gain, id };
   }
 
-  manager(slot: InstrumentSlot): VoiceManager | null {
+  manager(slot: SlotRef): VoiceManager | null {
+    if (isLoopSlot(slot)) return this.tracks.get(slot.slice(5))?.slot?.manager ?? null;
     return this.slots[slot]?.manager ?? null;
+  }
+
+  // ---- looper tracks ------------------------------------------------------------------------------------
+
+  hasTrack(id: string): boolean {
+    return this.tracks.has(id);
+  }
+
+  /** Add a looper track (its instrument, level and starting brightness). */
+  addTrack(
+    id: string,
+    part: TrackPart,
+    instrument: InstrumentId | 'drums',
+    opts: { gainDb: number; brightness: number },
+    time: number,
+  ): void {
+    if (this.tracks.has(id)) return;
+    const gain = this.ctx.createGain();
+    gain.gain.value = dbToGain(opts.gainDb);
+    gain.connect(this.loopBus[part]);
+    const track: Track = { part, gain, slot: null, kit: null };
+    if (instrument === 'drums') {
+      track.kit = new DrumKit(this.ctx);
+      track.kit.output.connect(gain);
+    } else {
+      track.slot = this.trackSlot(instrument, gain);
+      if (opts.brightness !== track.slot.manager.brightnessValue && instrument !== 'subBass')
+        track.slot.manager.setBrightness(opts.brightness, time, 0.01);
+    }
+    this.tracks.set(id, track);
+  }
+
+  private trackSlot(id: InstrumentId, out: AudioNode): Slot {
+    const gain = this.ctx.createGain();
+    gain.connect(out);
+    return { manager: new VoiceManager(this.ctx, this.patchTransform(PATCHES[id]), gain), gain, id };
+  }
+
+  /** Change a track's instrument with the same crossfade as the live slots. */
+  setTrackInstrument(id: string, instrument: InstrumentId, time: number): void {
+    const t = this.tracks.get(id);
+    if (!t?.slot || t.slot.id === instrument) return;
+    const old = t.slot;
+    const next = this.trackSlot(instrument, t.gain);
+    next.gain.gain.value = 0;
+    old.manager.releaseAll(time);
+    glideTo(old.gain.gain, 0, time, 0.15);
+    glideTo(next.gain.gain, 1, time, 0.05);
+    next.manager.setBrightness(old.manager.brightnessValue, time, 0.01);
+    this.retired.push({ manager: old.manager, gain: old.gain, at: time + 3 });
+    t.slot = next;
+  }
+
+  setTrackGain(id: string, db: number, time: number): void {
+    const t = this.tracks.get(id);
+    if (t) glideTo(t.gain.gain, dbToGain(db), time, 0.03);
+  }
+
+  /** Release and fade a track out, then free it. */
+  removeTrack(id: string, time: number): void {
+    const t = this.tracks.get(id);
+    if (!t) return;
+    this.tracks.delete(id);
+    t.slot?.manager.releaseAll(time);
+    glideTo(t.gain.gain, 0, time, 0.05);
+    if (t.slot) this.retired.push({ manager: t.slot.manager, gain: t.gain, at: time + 3 });
+    else setTimeout(() => t.gain.disconnect(), 3000);
+  }
+
+  releaseTracks(time: number): void {
+    for (const t of this.tracks.values()) t.slot?.manager.releaseAll(time);
+  }
+
+  /** Metronome / count-in tick. Goes straight to the kit, never through the bus (so it is never recorded). */
+  click(time: number, accent: boolean): void {
+    this.drums.click(time, accent);
   }
 
   schedule(e: MusicEvent): void {
@@ -250,7 +352,8 @@ export class AudioEngine {
       case 'chord': {
         const m = this.manager(e.slot);
         if (!m || e.play === false) return;
-        m.setChord(e.chord ? e.voicing : [], e.time, { transition: e.transition, velocity: e.velocity });
+        const voicing = e.chord || isLoopSlot(e.slot) ? e.voicing : [];
+        m.setChord(voicing, e.time, { transition: e.transition, velocity: e.velocity });
         break;
       }
       case 'noteOn':
@@ -265,18 +368,30 @@ export class AudioEngine {
       case 'slotRelease':
         this.manager(e.slot)?.releaseAll(e.time);
         break;
-      case 'drum':
-        this.drums.trigger(e.voice, e.velocity, e.time);
+      case 'drum': {
+        const kit = e.slot ? this.tracks.get(e.slot.slice(5))?.kit : this.drums;
+        if (!kit) return;
+        kit.trigger(e.voice, e.velocity, e.time);
         if (e.voice === 'kick') this.ducker.trigger(e.time, e.velocity);
         break;
+      }
       case 'param':
-        this.setParam(e.target, e.value, e.time, e.rampMs / 1000);
+        if (e.slot) this.setTrackParam(e.slot.slice(5), e.target, e.value, e.time, e.rampMs / 1000);
+        else this.setParam(e.target, e.value, e.time, e.rampMs / 1000);
         break;
       case 'transport':
         this.ctx.transport.bpm.setValueAtTime(e.bpm, e.time);
         this.delay?.delayTime.setValueAtTime(Tone.Time('8n.').toSeconds(), e.time);
         break;
     }
+  }
+
+  /** Track automation: only the per-instrument controls make sense on a single track. */
+  private setTrackParam(id: string, path: ParamPath, value: number, time: number, seconds: number) {
+    const m = this.tracks.get(id)?.slot?.manager;
+    if (!m) return;
+    if (path === 'macro.brightness') m.setBrightness(Math.max(0, Math.min(1, value)), time, seconds);
+    else if (path === 'melody.vibrato') m.setVibrato(Math.max(0, Math.min(1, value)), time, seconds);
   }
 
   setParam(path: ParamPath, value: number, time: number, seconds: number): void {
@@ -329,6 +444,9 @@ export class AudioEngine {
       case 'drums.level':
         glideTo(this.drumsGain.gain, v, time, tau);
         break;
+      case 'loops.level':
+        for (const g of Object.values(this.loopBus)) glideTo(g.gain, v, time, tau);
+        break;
       case 'melody.level':
         if (this.slots.melody) glideTo(this.slots.melody.gain.gain, v, time, tau);
         break;
@@ -349,6 +467,7 @@ export class AudioEngine {
     }
   }
 
+  /** Release the live slots (looper tracks keep playing; see releaseTracks). */
   releaseAll(time: number): void {
     for (const s of Object.values(this.slots)) s?.manager.releaseAll(time);
   }
@@ -365,6 +484,7 @@ export class AudioEngine {
 
   dispose(): void {
     for (const s of Object.values(this.slots)) s?.manager.dispose();
+    for (const t of this.tracks.values()) t.slot?.manager.dispose();
     for (const r of this.retired) r.manager.dispose();
     this.chorus?.dispose();
     this.delay?.dispose();

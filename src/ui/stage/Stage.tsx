@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { APP_NAME } from '../../config/app';
 import { useLiveSnapshot } from '../../state/live';
+import { useLooper } from '../../state/looper';
 import { useGroove, useMusic } from '../../state/music';
 import { startCamera, stopSession } from '../../state/session';
 import { useApp } from '../../state/store';
 import { CalibrationFlow } from '../calibration/CalibrationFlow';
 import { DebugPanel } from '../debug/DebugPanel';
 import { GroovePanel } from '../groove/GroovePanel';
+import { LooperPanel } from '../looper/LooperPanel';
+import { PianoRoll } from '../looper/PianoRoll';
 import { MappingEditor } from '../mapping/MappingEditor';
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { useKeyboardInput } from '../useKeyboardInput';
@@ -61,6 +64,7 @@ function TopBar() {
         </span>
       )}
       <span className={styles.spacer} />
+      <LoopChip />
       <GrooveChip />
       <nav className={styles.nav} aria-label="Panels">
         <button
@@ -69,6 +73,13 @@ function TopBar() {
           onClick={() => togglePanel('groove')}
         >
           Groove
+        </button>
+        <button
+          className={styles.btn}
+          aria-pressed={panel === 'looper'}
+          onClick={() => togglePanel('looper')}
+        >
+          Looper
         </button>
         <button
           className={styles.btn}
@@ -101,6 +112,21 @@ function GrooveChip() {
   return (
     <span className={styles.chip} title="Tempo and bar.beat">
       <strong className="tabular">{Math.round(bpm)}</strong> bpm{parts ? ` · ${parts} · ${position}` : ''}
+    </span>
+  );
+}
+
+function LoopChip() {
+  const rec = useLooper((s) => s.rec);
+  const playing = useLooper((s) => s.playing);
+  const position = useLooper((s) => s.position);
+  const bars = useLooper((s) => s.project.bars);
+  if (rec === 'off' && !playing) return null;
+  const label = rec === 'countIn' ? '● count-in' : rec === 'recording' ? '● rec' : '▶ loop';
+  return (
+    <span className={`${styles.chip} ${rec !== 'off' ? styles.recChip : ''}`} title="Looper" role="status">
+      {label} <strong className="tabular">{position}</strong>
+      {bars > 0 && rec !== 'countIn' ? ` / ${bars}` : ''}
     </span>
   );
 }
@@ -169,6 +195,7 @@ export function Stage() {
             {padOpen && <TouchPad />}
           </>
         )}
+        <PianoRoll />
         {source === 'camera' && phase === 'running' && calibrating && <CalibrationFlow />}
         {phase === 'starting' && (
           <div className={styles.loading} role="status">
@@ -183,6 +210,7 @@ export function Stage() {
       {panel === 'mappings' && <MappingEditor />}
       {panel === 'settings' && <SettingsPanel />}
       {panel === 'groove' && <GroovePanel />}
+      {panel === 'looper' && <LooperPanel />}
     </div>
   );
 }
