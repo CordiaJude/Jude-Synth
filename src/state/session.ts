@@ -5,6 +5,7 @@ import { DemoSource } from '../vision/demoSource';
 import type { WorkerSettings } from '../vision/protocol';
 import { VisionClient } from '../vision/visionClient';
 import { live } from './live';
+import { ensureAudio, stopAudio } from './music';
 import { useApp, type TrackingSettings } from './store';
 
 let stream: MediaStream | null = null;
@@ -46,6 +47,7 @@ function cameraErrorMessage(err: unknown): string {
 
 /** Ask for the camera: the stage mounts and calls startCamera with its video element. */
 export function requestCamera(): void {
+  void ensureAudio(); // inside the click handler: browsers only start audio on a user gesture
   useApp.getState().setPhase('starting', 'camera');
 }
 
@@ -93,6 +95,7 @@ export function setCaptureRaw(enabled: boolean): void {
 }
 
 export function startDemo(): void {
+  void ensureAudio();
   live.reset();
   demo = new DemoSource((msg) => live.publish(msg));
   demo.start(30);
@@ -101,6 +104,7 @@ export function startDemo(): void {
 }
 
 export function stopSession(): void {
+  stopAudio();
   client?.stop();
   client = null;
   demo?.stop();

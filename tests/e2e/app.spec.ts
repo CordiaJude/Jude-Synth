@@ -35,6 +35,18 @@ test('demo mode recognizes synthetic poses without a camera', async ({ page }) =
   }
   expect(seen.size).toBeGreaterThanOrEqual(3);
   await expect(page.getByLabel('Debug panel')).toBeVisible();
+
+  // Phase 2: the gestures drive chords. The chord display shows a name and a Roman numeral in C major.
+  await expect(page.getByRole('button', { name: 'Sound on' })).toBeVisible({ timeout: 10_000 });
+  const romans = new Set<string>();
+  for (let i = 0; i < 40 && romans.size < 3; i++) {
+    const roman = (await page.locator('[class*="chordRoman"]').textContent())?.trim();
+    if (roman) romans.add(roman);
+    await page.waitForTimeout(150);
+  }
+  expect(romans.size).toBeGreaterThanOrEqual(3);
+  for (const r of romans) expect(r).toMatch(/^[♭♯]?(I|II|III|IV|V|VI|VII|i|ii|iii|iv|v|vi|vii)/);
+  await expect(page.getByText('C Major (Ionian)', { exact: false }).first()).toBeVisible();
 });
 
 test('camera pipeline runs in a worker without blocking the main thread', async ({ page }) => {

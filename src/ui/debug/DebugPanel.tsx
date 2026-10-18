@@ -1,5 +1,7 @@
 import type { HandGesture } from '../../gestures/types';
 import { useLiveSnapshot } from '../../state/live';
+import { getEngine, useMusic } from '../../state/music';
+import { noteName } from '../../theory/notes';
 import { DEFAULT_TRACKING, useApp } from '../../state/store';
 import { FINGERS } from '../../vision/landmarks';
 import { POSE_LABEL } from '../labels';
@@ -57,6 +59,51 @@ function Pipeline() {
               {vision.longTasks}
               {vision.longTasks ? ` (max ${vision.longTaskMaxMs.toFixed(0)} ms)` : ''}
             </dd>
+          </>
+        )}
+      </dl>
+    </section>
+  );
+}
+
+function AudioSection() {
+  const status = useMusic((s) => s.status);
+  const error = useMusic((s) => s.error);
+  const p50 = useMusic((s) => s.latencyP50);
+  const p95 = useMusic((s) => s.latencyP95);
+  const chord = useMusic((s) => s.chord);
+  useLiveSnapshot(4); // refresh engine readouts a few times per second
+  const engine = getEngine();
+  const lat = engine?.latency();
+  const now = engine?.now() ?? 0;
+  const voices = engine ? (engine.manager('chords')?.activeVoices(now) ?? 0) : 0;
+  const reduction = engine ? -20 * Math.log10(Math.max(1e-6, engine.limiterGain)) : 0;
+  return (
+    <section className={styles.section}>
+      <h3>Audio</h3>
+      <dl className={styles.grid}>
+        <dt>engine</dt>
+        <dd className={status === 'error' ? styles.bad : undefined}>{error ?? status}</dd>
+        {engine && lat && (
+          <>
+            <dt>sample rate</dt>
+            <dd>{engine.ctx.sampleRate} Hz</dd>
+            <dt>base / output latency</dt>
+            <dd>
+              {ms(lat.base * 1000)} / {ms(lat.output * 1000)}
+            </dd>
+            <dt>scheduling lookahead</dt>
+            <dd>{ms(lat.lookahead * 1000)}</dd>
+            <dt>camera→sound p50</dt>
+            <dd className={p50 && p50 < 60 ? styles.good : undefined}>{p50 ? ms(p50) : '—'}</dd>
+            <dt>camera→sound p95</dt>
+            <dd>{p95 ? ms(p95) : '—'}</dd>
+            <dt>active chord voices</dt>
+            <dd>{voices}</dd>
+            <dt>limiter reduction</dt>
+            <dd>{reduction.toFixed(1)} dB</dd>
+            <dt>voicing</dt>
+            <dd>{chord ? chord.notes.map((n) => noteName(n)).join(' ') : '—'}</dd>
           </>
         )}
       </dl>
@@ -272,6 +319,7 @@ export function DebugPanel() {
   return (
     <aside className={styles.panel} aria-label="Debug panel">
       <Pipeline />
+      <AudioSection />
       <Hands />
       <Events />
       <Tuning />

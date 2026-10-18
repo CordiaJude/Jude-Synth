@@ -8,9 +8,12 @@ data ever leaves the browser (enforced by a `connect-src 'self'` Content-Securit
 
 ## Status
 
-**Phase 1 — tracking core** (this build): hand tracking in a Web Worker, One Euro smoothing, stable hand
-IDs, a rotation-invariant pose recognizer, continuous features, gesture events, a debug overlay and a
-capture & label tool. No sound yet — that is Phase 2.
+- **Phase 1 — tracking core:** hand tracking in a Web Worker, One Euro smoothing, stable hand IDs, a
+  rotation-invariant pose recognizer, continuous features, gesture events, debug overlay, capture & label tool.
+- **Phase 2 — sound (this build):** theory engine (7 modes, diatonic 7ths/9ths, sus, modal interchange,
+  Roman numerals, automatic voice leading, scale quantizer), a click-free polyphonic synth (Supersaw Pad,
+  Warm Analog Poly, Sub Bass), an FX bus (chorus, tempo-synced ping-pong delay, procedural convolution
+  reverb, tape saturation and lookahead limiter as AudioWorklets), and the **Classic Two-Hand** preset.
 
 ## Run it locally
 
@@ -29,13 +32,35 @@ Other scripts:
 
 | Command | What it does |
 |---|---|
-| `pnpm test` | Unit tests (Vitest): filter, tracker, finger extension, poses, features, events, calibration |
-| `pnpm e2e` | Builds, serves the production bundle, runs Playwright in Chromium with a fake webcam |
+| `pnpm test` | Unit tests (Vitest): theory, voice leading, Classic preset, DSP cores, click detectors, filter, tracker, poses, features, events, calibration |
+| `pnpm e2e` | Builds, serves the production bundle, runs Playwright in Chromium with a fake webcam, plus the offline-render click tests |
 | `pnpm typecheck` / `pnpm lint` | Strict TypeScript / ESLint |
 | `pnpm build && pnpm preview` | Production build served with the real CSP headers |
 
 If Playwright's own Chromium isn't installed, point it at any Chromium:
 `PLAYWRIGHT_CHROMIUM_PATH=/path/to/chrome pnpm e2e`.
+
+## Playing Classic Two-Hand (Phase 2)
+
+| Hand | Gesture | Does |
+|---|---|---|
+| Primary (left) | 1 · 2 · 3 · 4 fingers, open hand, index+pinky, thumb+index+pinky | chord on degree I … VII of the key |
+| Primary | tilt the wrist past ~30° | borrow that chord from the parallel mode (IV → iv, VI → ♭VI, VII → ♭VII …) |
+| Primary | fist (or take the hand away) | release the chord |
+| Secondary (right) | 1 · 2 · 3 · 4 fingers / open | triad · 7th · 9th · sus4 / triad |
+| Secondary | fist | voice the chord an octave lower |
+| Secondary | height · wrist tilt · distance | volume · brightness (filter) · space (reverb) |
+
+Chords are voice-led (each voice moves to the nearest note of the next chord) and the Sub Bass follows
+the root. Key, mode, instrument and bass are in the bar under the top bar; the chord name and Roman
+numeral are shown large. The demo mode plays too.
+
+**No clicks, verified.** `pnpm e2e` renders scripted performances through the real engine offline
+(Tone.Offline) and checks every sample. Every instrument's real patch — envelopes, resonant filter
+envelopes, glides, voice stealing, crossfades — is rendered with its oscillators swapped for sines, where a
+click is unambiguous (a sum of sines has a bounded second derivative). Positive controls prove the
+detector catches naive synthesis and a deliberately broken hard-cut release. Full-FX renders of the real
+waveforms check levels, NaNs and the −1 dBFS limiter ceiling.
 
 ## What to try in Phase 1
 

@@ -21,7 +21,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm build && pnpm preview --port 4173 --strictPort',
+    command: 'HANDWAVE_HARNESS=1 pnpm build && pnpm preview --port 4173 --strictPort',
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

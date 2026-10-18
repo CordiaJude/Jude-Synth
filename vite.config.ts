@@ -6,7 +6,8 @@ import { defineConfig, type Plugin } from 'vite';
 // connect-src 'self' guarantees no video or landmark data can leave the browser.
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'wasm-unsafe-eval'",
+  // blob: is needed because Tone's standardized-audio-context loads AudioWorklet modules from blob URLs.
+  "script-src 'self' 'wasm-unsafe-eval' blob:",
   "worker-src 'self' blob:",
   "connect-src 'self' blob: data:",
   "img-src 'self' blob: data:",
@@ -31,8 +32,16 @@ function cspMeta(): Plugin {
   };
 }
 
+// The offline-render audio test harness is only built for tests (HANDWAVE_HARNESS=1).
+const harness = process.env.HANDWAVE_HARNESS === '1';
+
 export default defineConfig({
   plugins: [react(), cspMeta()],
+  build: {
+    rollupOptions: {
+      input: harness ? { main: 'index.html', harness: 'audio-harness.html' } : { main: 'index.html' },
+    },
+  },
   worker: { format: 'es' },
   server: {
     // The dev server needs inline scripts for React Fast Refresh, so it only sends cross-origin isolation headers.

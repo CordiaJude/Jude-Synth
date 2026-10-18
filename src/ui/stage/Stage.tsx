@@ -2,10 +2,12 @@ import { useEffect, useRef } from 'react';
 import { APP_NAME } from '../../config/app';
 import { useLiveSnapshot } from '../../state/live';
 import { startCamera, stopSession } from '../../state/session';
+import { useMusic } from '../../state/music';
 import { useApp } from '../../state/store';
 import { DebugPanel } from '../debug/DebugPanel';
 import { attachOverlay } from './drawOverlay';
 import { HandHud } from './HandHud';
+import { ChordDisplay, SoundControls } from './SoundControls';
 import styles from './Stage.module.css';
 
 function useOverlayCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, enabled: boolean) {
@@ -18,6 +20,7 @@ function TopBar() {
   const debugOpen = useApp((s) => s.debugOpen);
   const toggleDebug = useApp((s) => s.toggleDebug);
   const { fps, latencyP50 } = useLiveSnapshot(4);
+  const soundLatency = useMusic((s) => s.latencyP50);
   return (
     <header className={styles.topbar}>
       <span className={styles.brand}>{APP_NAME}</span>
@@ -28,8 +31,9 @@ function TopBar() {
         <strong className="tabular">{fps}</strong> fps
       </span>
       {source === 'camera' && (
-        <span className={styles.chip} title="Camera capture → gesture recognized (main thread)">
-          <strong className="tabular">{latencyP50.toFixed(0)}</strong> ms tracking
+        <span className={styles.chip} title="Camera capture → sound at the speaker (median)">
+          <strong className="tabular">{(soundLatency || latencyP50).toFixed(0)}</strong> ms{' '}
+          {soundLatency ? 'to sound' : 'tracking'}
         </span>
       )}
       {source === 'demo' && <span className={styles.chip}>demo · synthetic hands</span>}
@@ -92,6 +96,8 @@ export function Stage() {
         )}
         <canvas ref={canvas} className={styles.canvas} aria-hidden="true" />
         <TopBar />
+        <SoundControls />
+        <ChordDisplay />
         <LowLightBanner />
         <HandHud />
         {phase === 'starting' && (
