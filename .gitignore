@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+playwright-report
+test-results
+*.log
+.DS_Store
+# Fetched/copied by scripts/setup-mediapipe.mjs (checksummed)
+public/mediapipe/*
+!public/mediapipe/.gitkeep
