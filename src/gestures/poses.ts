@@ -4,7 +4,10 @@
 import type { PoseId } from './types';
 
 /** Target per finger [thumb, index, middle, ring, pinky]: 1 extended, 0 curled. */
-export const POSE_TEMPLATES: ReadonlyArray<{ pose: PoseId; target: readonly [0 | 1, 0 | 1, 0 | 1, 0 | 1, 0 | 1] }> = [
+export const POSE_TEMPLATES: ReadonlyArray<{
+  pose: PoseId;
+  target: readonly [0 | 1, 0 | 1, 0 | 1, 0 | 1, 0 | 1];
+}> = [
   { pose: 'fist', target: [0, 0, 0, 0, 0] },
   { pose: 'one', target: [0, 1, 0, 0, 0] },
   { pose: 'two', target: [0, 1, 1, 0, 0] },
@@ -42,7 +45,10 @@ export function extendedProbabilities(
  * Score every pose, best first. `pinchCloseness` (0..1, 1 = tips touching) both scores the 'pinch' (OK-sign)
  * pose and discounts templates that need thumb and index both extended — touching tips can't be "open".
  */
-export function scorePoses(pExt: ArrayLike<number>, pinchCloseness: number): Array<{ pose: PoseId; score: number }> {
+export function scorePoses(
+  pExt: ArrayLike<number>,
+  pinchCloseness: number,
+): Array<{ pose: PoseId; score: number }> {
   const out: Array<{ pose: PoseId; score: number }> = [];
   for (const { pose, target } of POSE_TEMPLATES) {
     let logSum = 0;

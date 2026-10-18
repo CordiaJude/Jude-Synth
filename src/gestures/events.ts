@@ -89,7 +89,13 @@ export function stepSwipe(
     s.armed = false;
     s.cooldownUntil = t + cfg.swipeCooldownMs;
     const horizontal = Math.abs(s.peakVx) >= Math.abs(s.peakVy);
-    const direction: SwipeDirection = horizontal ? (s.peakVx > 0 ? 'right' : 'left') : s.peakVy > 0 ? 'up' : 'down';
+    const direction: SwipeDirection = horizontal
+      ? s.peakVx > 0
+        ? 'right'
+        : 'left'
+      : s.peakVy > 0
+        ? 'up'
+        : 'down';
     return { direction, speed: s.peak };
   }
   return null;

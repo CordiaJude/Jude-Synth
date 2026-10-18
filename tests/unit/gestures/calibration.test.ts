@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildCalibration } from '../../../src/gestures/calibration';
 import { createRecognizer, extensionsOf, recognize } from '../../../src/gestures/recognizer';
-import { buildLocalHand, mulberry32, placeHand, shapeFor, type HandShape } from '../../../src/gestures/testing/synthetic';
+import {
+  buildLocalHand,
+  mulberry32,
+  placeHand,
+  shapeFor,
+  type HandShape,
+} from '../../../src/gestures/testing/synthetic';
 import { ASPECT, frame, tracked } from '../support/frames';
 
 /** A user whose "open" hand is never fully straight and whose fist is loose. */
@@ -53,7 +59,8 @@ describe('calibration', () => {
     const cal = buildCalibration({ open, fist }, 0);
     const st = createRecognizer({}, cal);
     const s = sample(shapeFor('open'), rng, 0.3);
-    const h = recognize(st, frame([tracked({ ...s, handedness: 'Right', handednessScore: 0.95 })], 0)).out.hands[0]!;
+    const h = recognize(st, frame([tracked({ ...s, handedness: 'Right', handednessScore: 0.95 })], 0)).out
+      .hands[0]!;
     expect(h.features.depth).toBeGreaterThan(0.35);
     expect(h.features.depth).toBeLessThan(0.65);
   });
@@ -63,7 +70,9 @@ describe('calibration', () => {
     const open = Array.from({ length: 5 }, () => sample(shapeFor('fist'), rng));
     const fist = Array.from({ length: 5 }, () => sample(shapeFor('fist'), rng));
     const cal = buildCalibration({ open, fist }, 0);
-    expect(cal.fingerExtension.index).toEqual(createRecognizer().calibration?.fingerExtension.index ?? cal.fingerExtension.index);
+    expect(cal.fingerExtension.index).toEqual(
+      createRecognizer().calibration?.fingerExtension.index ?? cal.fingerExtension.index,
+    );
     expect(cal.fingerExtension.index.open).toBeGreaterThan(cal.fingerExtension.index.curled + 0.25);
   });
 });

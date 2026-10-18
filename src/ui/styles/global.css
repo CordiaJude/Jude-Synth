@@ -1,0 +1,76 @@
+:root {
+  --bg: #07080c;
+  --bg-raised: #0f1118;
+  --bg-panel: rgba(14, 16, 24, 0.86);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --text: #eef0f6;
+  --text-dim: #9aa0b3;
+  --text-faint: #5f6578;
+  /* Role colours: blue/orange is distinguishable for all common forms of colour-vision deficiency. */
+  --primary: #3fa7ff;
+  --secondary: #ff9f2e;
+  --accent: #b8f35a;
+  --warn: #ffd166;
+  --danger: #ff5d73;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+  border-radius: var(--radius-sm);
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

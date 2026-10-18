@@ -22,7 +22,11 @@ function cspMeta(): Plugin {
     name: 'handwave-csp-meta',
     apply: 'build',
     transformIndexHtml: () => [
-      { tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP }, injectTo: 'head-prepend' },
+      {
+        tag: 'meta',
+        attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP },
+        injectTo: 'head-prepend',
+      },
     ],
   };
 }

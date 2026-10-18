@@ -49,10 +49,14 @@ export function buildCalibration(input: CalibrationInput, now: number): Calibrat
     }
   });
 
-  const scales = [...input.open, ...input.fist].map((s) => imageScale(s.image, s.world, s.aspect)).filter((x) => x > 0);
+  const scales = [...input.open, ...input.fist]
+    .map((s) => imageScale(s.image, s.world, s.aspect))
+    .filter((x) => x > 0);
   const typical = median(scales);
   // Calibration happens at a comfortable playing distance; allow ~2.2× closer and ~2.5× farther.
-  const palmScale = Number.isFinite(typical) ? { near: typical * 2.2, far: typical / 2.5 } : DEFAULT_PALM_SCALE;
+  const palmScale = Number.isFinite(typical)
+    ? { near: typical * 2.2, far: typical / 2.5 }
+    : DEFAULT_PALM_SCALE;
 
   let pinch = DEFAULT_PINCH;
   if (input.pinch?.length) {

@@ -5,12 +5,23 @@ import { buildLocalHand, placeHand, shapeFor, type HandShape } from '../../../sr
 import { DEFAULT_GESTURE_CONFIG as CFG, type GestureEvent, type PoseId } from '../../../src/gestures/types';
 import { ASPECT, detection, frame, tracked } from '../support/frames';
 
-const PLACE = { handedness: 'Right' as const, roll: 0.3, pitch: 0.2, yaw: -0.3, cx: 0.5, cy: 0.5, imageScale: 0.25, aspect: ASPECT };
+const PLACE = {
+  handedness: 'Right' as const,
+  roll: 0.3,
+  pitch: 0.2,
+  yaw: -0.3,
+  cx: 0.5,
+  cy: 0.5,
+  imageScale: 0.25,
+  aspect: ASPECT,
+};
 
 const run = (poses: Array<Exclude<PoseId, 'none'>>, place: (i: number) => object = () => ({})) => {
   const st = createRecognizer();
   const events: GestureEvent[] = [];
-  poses.forEach((p, i) => events.push(...recognize(st, frame([tracked(detection(p, place(i)))], i * 33, i)).out.events));
+  poses.forEach((p, i) =>
+    events.push(...recognize(st, frame([tracked(detection(p, place(i)))], i * 33, i)).out.events),
+  );
   return events;
 };
 
@@ -63,7 +74,10 @@ describe('swipe', () => {
 
   it('detects swipes from moving landmarks', () => {
     const xs = [0.2, 0.2, 0.2, 0.3, 0.45, 0.6, 0.68, 0.7, 0.7];
-    const ev = run(xs.map(() => 'open' as const), (i) => ({ cx: xs[i] })).filter((e) => e.type === 'swipe');
+    const ev = run(
+      xs.map(() => 'open' as const),
+      (i) => ({ cx: xs[i] }),
+    ).filter((e) => e.type === 'swipe');
     expect(ev).toHaveLength(1);
     expect(ev[0]).toMatchObject({ direction: 'right' });
   });

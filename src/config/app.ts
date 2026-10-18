@@ -7,14 +7,3 @@ export const PRIVACY_STATEMENT =
 /** Base URL for self-hosted MediaPipe assets (see scripts/setup-mediapipe.mjs). */
 export const MEDIAPIPE_BASE = `${import.meta.env.BASE_URL}mediapipe`;
 export const HAND_MODEL_URL = `${MEDIAPIPE_BASE}/hand_landmarker.task`;
-
-/** Camera request: prefer 60 fps (halves frame-interval latency) and a modest resolution. */
-export const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
-  audio: false,
-  video: {
-    facingMode: 'user',
-    width: { ideal: 1280 },
-    height: { ideal: 720 },
-    frameRate: { ideal: 60, max: 60 },
-  },
-};

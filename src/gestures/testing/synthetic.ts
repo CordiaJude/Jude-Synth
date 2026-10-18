@@ -35,16 +35,37 @@ export interface ThumbShape {
   flexToward: Vec3;
 }
 
-const THUMB_OUT: ThumbShape = { adduct: -0.15, mcp: 0.1, ip: 0.08, across: vec(1, -0.6, 0.1), flexToward: vec(0.6, 0.8, 0.2) };
+const THUMB_OUT: ThumbShape = {
+  adduct: -0.15,
+  mcp: 0.1,
+  ip: 0.08,
+  across: vec(1, -0.6, 0.1),
+  flexToward: vec(0.6, 0.8, 0.2),
+};
 /** Folded across the palm toward the ring-finger base (as in "four"). */
-const THUMB_TUCK: ThumbShape = { adduct: 0.6, mcp: 0.7, ip: 0.9, across: vec(1, -0.6, 0.1), flexToward: vec(0.6, 0.8, 0.2) };
+const THUMB_TUCK: ThumbShape = {
+  adduct: 0.6,
+  mcp: 0.7,
+  ip: 0.9,
+  across: vec(1, -0.6, 0.1),
+  flexToward: vec(0.6, 0.8, 0.2),
+};
 /** Wrapped over the curled index/middle fingers (as in a fist). */
-const THUMB_FIST: ThumbShape = { adduct: 0.6, mcp: 0.3, ip: 0.9, across: vec(1, 0.2, 0.1), flexToward: vec(0.6, 0.8, 0.2) };
+const THUMB_FIST: ThumbShape = {
+  adduct: 0.6,
+  mcp: 0.3,
+  ip: 0.9,
+  across: vec(1, 0.2, 0.1),
+  flexToward: vec(0.6, 0.8, 0.2),
+};
 
 const f = (on: boolean): FingerFlex => (on ? STRAIGHT : CURLED);
 
 /** Canonical finger states for each pose: [thumb, index, middle, ring, pinky]. */
-export const POSE_FINGERS: Record<Exclude<PoseId, 'none' | 'pinch'>, [boolean, boolean, boolean, boolean, boolean]> = {
+export const POSE_FINGERS: Record<
+  Exclude<PoseId, 'none' | 'pinch'>,
+  [boolean, boolean, boolean, boolean, boolean]
+> = {
   fist: [false, false, false, false, false],
   one: [false, true, false, false, false],
   two: [false, true, true, false, false],
@@ -92,7 +113,12 @@ export function varyShape(shape: HandShape, rng: () => number, amount = 0.25): H
     middle: jf(shape.middle),
     ring: jf(shape.ring),
     pinky: jf(shape.pinky),
-    thumb: { ...shape.thumb, adduct: shape.thumb.adduct + (rng() * 2 - 1) * amount * 0.6, mcp: j(shape.thumb.mcp), ip: j(shape.thumb.ip) },
+    thumb: {
+      ...shape.thumb,
+      adduct: shape.thumb.adduct + (rng() * 2 - 1) * amount * 0.6,
+      mcp: j(shape.thumb.mcp),
+      ip: j(shape.thumb.ip),
+    },
     splay: (shape.splay ?? 0.1) + (rng() * 2 - 1) * 0.08,
   };
 }
@@ -144,7 +170,13 @@ export function buildLocalHand(shape: HandShape): Float64Array {
     // Base direction fans out from a point below the wrist, plus splay.
     let dir = normalize(vec(mcp.x - fanOrigin.x, mcp.y - fanOrigin.y, 0));
     const spread = (k - 1.3) * splay;
-    dir = normalize(vec(dir.x * Math.cos(spread) - dir.y * Math.sin(spread), dir.x * Math.sin(spread) + dir.y * Math.cos(spread), 0));
+    dir = normalize(
+      vec(
+        dir.x * Math.cos(spread) - dir.y * Math.sin(spread),
+        dir.x * Math.sin(spread) + dir.y * Math.cos(spread),
+        0,
+      ),
+    );
     // Curl axis: flexion rotates the finger from `dir` toward the palm normal (toward the camera).
     const flex = shape[finger];
     let p = mcp;
@@ -290,7 +322,17 @@ export function syntheticHand(
   const shape = variation > 0 && rng ? varyShape(shapeFor(pose), rng, variation) : shapeFor(pose);
   return placeHand(
     buildLocalHand(shape),
-    { handedness: 'Right', roll: 0, pitch: 0, yaw: 0, cx: 0.5, cy: 0.5, imageScale: 0.25, aspect: 16 / 9, ...pl },
+    {
+      handedness: 'Right',
+      roll: 0,
+      pitch: 0,
+      yaw: 0,
+      cx: 0.5,
+      cy: 0.5,
+      imageScale: 0.25,
+      aspect: 16 / 9,
+      ...pl,
+    },
     noise,
     rng,
   );

@@ -55,7 +55,15 @@ describe('pose recognition is rotation invariant (synthetic grid)', () => {
             for (const yaw of yaws) {
               const got = classify(
                 pose,
-                { handedness, roll: deg(roll), pitch: deg(pitch), yaw: deg(yaw), cx: 0.3 + rng() * 0.4, cy: 0.3 + rng() * 0.4, imageScale: 0.15 + rng() * 0.2 },
+                {
+                  handedness,
+                  roll: deg(roll),
+                  pitch: deg(pitch),
+                  yaw: deg(yaw),
+                  cx: 0.3 + rng() * 0.4,
+                  cy: 0.3 + rng() * 0.4,
+                  imageScale: 0.15 + rng() * 0.2,
+                },
                 rng,
               );
               total++;
@@ -70,7 +78,9 @@ describe('pose recognition is rotation invariant (synthetic grid)', () => {
       expect(accuracy, `confusions: ${JSON.stringify(confusion)}`).toBeGreaterThanOrEqual(0.99);
       for (const pose of POSES) {
         const misses = Object.values(confusion[pose] ?? {}).reduce((a, b) => a + b, 0);
-        expect(misses / (total / POSES.length), `${pose}: ${JSON.stringify(confusion[pose])}`).toBeLessThan(0.03);
+        expect(misses / (total / POSES.length), `${pose}: ${JSON.stringify(confusion[pose])}`).toBeLessThan(
+          0.03,
+        );
       }
     });
   }
@@ -80,14 +90,18 @@ describe('pose stability', () => {
   it('debounces: a single-frame glitch does not change the committed pose', () => {
     const st = createRecognizer({ poseDebounceMs: 45 });
     const seq: Array<Exclude<PoseId, 'none'>> = ['two', 'two', 'two', 'three', 'two', 'two'];
-    const out = seq.map((p, i) => recognize(st, frame([tracked(detection(p))], i * 33, i)).out.hands[0]!.pose.pose);
+    const out = seq.map(
+      (p, i) => recognize(st, frame([tracked(detection(p))], i * 33, i)).out.hands[0]!.pose.pose,
+    );
     expect(out.slice(2)).toEqual(['two', 'two', 'two', 'two']);
   });
 
   it('commits a real change within debounce + one frame', () => {
     const st = createRecognizer({ poseDebounceMs: 45 });
     const seq: Array<Exclude<PoseId, 'none'>> = ['fist', 'fist', 'fist', 'open', 'open', 'open'];
-    const out = seq.map((p, i) => recognize(st, frame([tracked(detection(p))], i * 33, i)).out.hands[0]!.pose.pose);
+    const out = seq.map(
+      (p, i) => recognize(st, frame([tracked(detection(p))], i * 33, i)).out.hands[0]!.pose.pose,
+    );
     expect(out[5]).toBe('open');
     expect(out.indexOf('open')).toBeLessThanOrEqual(5);
   });
@@ -95,7 +109,8 @@ describe('pose stability', () => {
   it('reports confidence in [0,1] with the committed pose ranked first', () => {
     const st = createRecognizer();
     let pose = null;
-    for (let i = 0; i < 4; i++) pose = recognize(st, frame([tracked(detection('four'))], i * 33, i)).out.hands[0]!.pose;
+    for (let i = 0; i < 4; i++)
+      pose = recognize(st, frame([tracked(detection('four'))], i * 33, i)).out.hands[0]!.pose;
     expect(pose!.pose).toBe('four');
     expect(pose!.ranked[0]!.pose).toBe('four');
     expect(pose!.confidence).toBeGreaterThan(0.6);
@@ -105,7 +120,8 @@ describe('pose stability', () => {
   it('counts extended fingers', () => {
     const st = createRecognizer();
     let count = 0;
-    for (let i = 0; i < 3; i++) count = recognize(st, frame([tracked(detection('three'))], i * 33, i)).out.hands[0]!.count;
+    for (let i = 0; i < 3; i++)
+      count = recognize(st, frame([tracked(detection('three'))], i * 33, i)).out.hands[0]!.count;
     expect(count).toBe(3);
   });
 });
@@ -120,13 +136,25 @@ describe('baseline comparison', () => {
       const expected = { one: 1, two: 2, three: 3, four: 4, fist: 0 }[pose];
       for (let k = 0; k < 120; k++) {
         const roll = deg((rng() * 2 - 1) * 120); // hands tilted up to sideways/upside-down
-        const det = detection(pose, { roll, pitch: deg((rng() * 2 - 1) * 30) }, { image: 0.002, world: 0.004 }, rng);
-        const naive = [[8, 6], [12, 10], [16, 14], [20, 18]].filter(([tip, pip]) => det.image[tip! * 3 + 1]! < det.image[pip! * 3 + 1]!).length;
+        const det = detection(
+          pose,
+          { roll, pitch: deg((rng() * 2 - 1) * 30) },
+          { image: 0.002, world: 0.004 },
+          rng,
+        );
+        const naive = [
+          [8, 6],
+          [12, 10],
+          [16, 14],
+          [20, 18],
+        ].filter(([tip, pip]) => det.image[tip! * 3 + 1]! < det.image[pip! * 3 + 1]!).length;
         const st = createRecognizer();
         let ours = 0;
         for (let f = 0; f < 3; f++) {
           const h = recognize(st, frame([tracked(det)], f * 33, f)).out.hands[0]!;
-          ours = [h.fingers.index, h.fingers.middle, h.fingers.ring, h.fingers.pinky].filter((x) => x.extended).length;
+          ours = [h.fingers.index, h.fingers.middle, h.fingers.ring, h.fingers.pinky].filter(
+            (x) => x.extended,
+          ).length;
         }
         n++;
         if (naive === expected) naiveOk++;

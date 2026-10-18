@@ -4,7 +4,15 @@
 
 import { FINGERS, LM, type Finger, type LandmarkArray } from '../vision/landmarks';
 import type { HandId, HandRole, TrackedHand, VisionFrame } from '../vision/types';
-import { stepPinch, stepSnap, stepSwipe, History, type PinchDetector, type SnapDetector, type SwipeDetector } from './events';
+import {
+  stepPinch,
+  stepSnap,
+  stepSwipe,
+  History,
+  type PinchDetector,
+  type SnapDetector,
+  type SwipeDetector,
+} from './events';
 import { depthFromScale, imagePalmCenter, imageScale, palmOrientation, pinchAmount } from './features';
 import { DEFAULT_FINGER_RANGES, fingerExtensions, palmSize } from './fingers';
 import { extendedProbabilities, scorePoses } from './poses';
@@ -105,7 +113,11 @@ function newHandState(h: TrackedHand, t: number): HandState {
 }
 
 /** A GestureEvent without the fields the recognizer fills in (distributes over the union). */
-type EventBody = GestureEvent extends infer E ? (E extends GestureEvent ? Omit<E, 'hand' | 'role' | 'time'> : never) : never;
+type EventBody = GestureEvent extends infer E
+  ? E extends GestureEvent
+    ? Omit<E, 'hand' | 'role' | 'time'>
+    : never
+  : never;
 
 const onePoleCoeff = (fc: number, dt: number): number => {
   const rc = 1 / (2 * Math.PI * fc);
@@ -156,7 +168,9 @@ function updatePose(
   const committedScore = ranked.find((r) => r.pose === s.pose)?.score ?? 0;
   const margin = s.pose === top.pose ? top.score - runnerUp : 0;
   const confidence =
-    s.pose === 'none' ? 0 : clamp01(committedScore * (0.6 + 0.4 * clamp01(margin / 0.3)) * Math.min(1, presence / 0.7));
+    s.pose === 'none'
+      ? 0
+      : clamp01(committedScore * (0.6 + 0.4 * clamp01(margin / 0.3)) * Math.min(1, presence / 0.7));
   return { pose: s.pose, confidence, ranked: ranked.slice(0, 4), heldMs: t - s.poseSince, tentative: false };
 }
 
@@ -238,7 +252,8 @@ function recognizeHand(
     tr.energy += (e - tr.energy) * (1 - Math.exp(-dt / 0.4));
   }
   const imgPalm = scaleNow * palmSize(h.world) || 1e-3;
-  const tremor = clamp01((Math.sqrt(tr.energy) / imgPalm) * 40);
+  // Scaled so typical landmark jitter reads ~0.1–0.2 and a deliberate shake saturates.
+  const tremor = clamp01((Math.sqrt(tr.energy) / imgPalm) * 10);
 
   const features: HandFeatures = {
     palmX: center.x,
@@ -283,7 +298,12 @@ function recognizeHand(
     const pAhead = extendedProbabilities(ahead, flags, cfg.extendEnter, cfg.extendExit);
     const predicted = scorePoses(pAhead, pinchCloseness)[0]!;
     if (predicted.pose !== s.pose && predicted.score > cfg.minPoseConfidence + 0.15) {
-      poseResult = { ...poseResult, pose: predicted.pose, confidence: predicted.score * 0.8, tentative: true };
+      poseResult = {
+        ...poseResult,
+        pose: predicted.pose,
+        confidence: predicted.score * 0.8,
+        tentative: true,
+      };
     }
   }
 
@@ -301,7 +321,8 @@ function recognizeHand(
   let midSpeed = 0;
   if (s.midTip.init) midSpeed = Math.hypot(relX - s.midTip.x, relY - s.midTip.y) / dt;
   s.midTip = { init: true, x: relX, y: relY };
-  const thumbMid = dist(at(h.world, LM.THUMB_TIP, tmpB), at(h.world, LM.MIDDLE_TIP, tmpC)) / palmSize(h.world);
+  const thumbMid =
+    dist(at(h.world, LM.THUMB_TIP, tmpB), at(h.world, LM.MIDDLE_TIP, tmpC)) / palmSize(h.world);
   const snap = stepSnap(s.snap, thumbMid, midSpeed, t, cfg);
   if (snap !== null) emit({ type: 'snap', peakSpeed: snap });
 

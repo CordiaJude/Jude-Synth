@@ -42,6 +42,7 @@ export const FINGER_CHAIN: Record<Finger, readonly [number, number, number, numb
 };
 
 /** Bones for drawing the skeleton. */
+// prettier-ignore
 export const HAND_BONES: ReadonlyArray<readonly [number, number]> = [
   [0, 1], [1, 2], [2, 3], [3, 4],
   [0, 5], [5, 6], [6, 7], [7, 8],
@@ -51,4 +52,10 @@ export const HAND_BONES: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /** Landmarks whose centroid we treat as the palm centre. */
-export const PALM_POINTS: readonly number[] = [LM.WRIST, LM.INDEX_MCP, LM.MIDDLE_MCP, LM.RING_MCP, LM.PINKY_MCP];
+export const PALM_POINTS: readonly number[] = [
+  LM.WRIST,
+  LM.INDEX_MCP,
+  LM.MIDDLE_MCP,
+  LM.RING_MCP,
+  LM.PINKY_MCP,
+];

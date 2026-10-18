@@ -1,2 +1,6 @@
 pnpm-lock.yaml
 public/mediapipe
+*.md
+dist
+playwright-report
+test-results

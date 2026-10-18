@@ -9,7 +9,6 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
-    "exactOptionalPropertyTypes": false,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
@@ -17,5 +16,5 @@
     "noEmit": true,
     "types": ["vite/client"]
   },
-  "include": ["src", "tests/unit"]
+  "include": ["src"]
 }

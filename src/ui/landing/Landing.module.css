@@ -1,0 +1,108 @@
+.page {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(63, 167, 255, 0.16), transparent 60%),
+    radial-gradient(900px 500px at 110% 110%, rgba(255, 159, 46, 0.12), transparent 60%), var(--bg);
+}
+.card {
+  width: min(640px, 100%);
+}
+.brand {
+  font-size: clamp(44px, 9vw, 84px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin: 0;
+  line-height: 1;
+  background: linear-gradient(92deg, var(--primary), #c7a6ff 55%, var(--secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.tagline {
+  font-size: 20px;
+  color: var(--text-dim);
+  margin: 14px 0 32px;
+}
+.privacy {
+  display: flex;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 28px;
+}
+.privacy svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.privacy h2 {
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+.privacy p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.primaryBtn,
+.ghostBtn {
+  border-radius: 999px;
+  padding: 13px 24px;
+  font-weight: 650;
+  border: 1px solid transparent;
+  transition:
+    transform 120ms ease,
+    background 120ms ease;
+}
+.primaryBtn {
+  background: var(--text);
+  color: var(--bg);
+}
+.primaryBtn:hover {
+  transform: translateY(-1px);
+}
+.ghostBtn {
+  background: transparent;
+  border-color: var(--line-strong);
+}
+.ghostBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.error {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 93, 115, 0.4);
+  background: rgba(255, 93, 115, 0.08);
+  color: #ffd6dc;
+}
+.steps {
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--text-dim);
+  margin-bottom: 18px;
+}

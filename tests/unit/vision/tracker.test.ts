@@ -13,7 +13,12 @@ describe('HandTracker', () => {
       const t = i * 33;
       const u = i / 60;
       // Left hand moves 0.2 → 0.8, right hand 0.8 → 0.2; they pass each other at frame 30.
-      const left = detection('open', { handedness: 'Left', cx: 0.2 + 0.6 * u, cy: 0.5 + 0.05 * Math.sin(u * 6) }, undefined, rng);
+      const left = detection(
+        'open',
+        { handedness: 'Left', cx: 0.2 + 0.6 * u, cy: 0.5 + 0.05 * Math.sin(u * 6) },
+        undefined,
+        rng,
+      );
       const right = detection('fist', { handedness: 'Right', cx: 0.8 - 0.6 * u, cy: 0.45 }, undefined, rng);
       // MediaPipe labels flip randomly while hands overlap.
       if (i > 25 && i < 35 && rng() < 0.5) {
@@ -56,7 +61,8 @@ describe('HandTracker', () => {
 
   it('smooths handedness: a single wrong label does not flip the track', () => {
     const tracker = new HandTracker();
-    for (let i = 0; i < 20; i++) tracker.update([detection('open', { handedness: 'Right', cx: 0.6 })], i * 33, ASPECT);
+    for (let i = 0; i < 20; i++)
+      tracker.update([detection('open', { handedness: 'Right', cx: 0.6 })], i * 33, ASPECT);
     const flipped = detection('open', { handedness: 'Right', cx: 0.6 });
     flipped.handedness = 'Left';
     const [h] = tracker.update([flipped], 20 * 33, ASPECT);
@@ -67,7 +73,11 @@ describe('HandTracker', () => {
     const tracker = new HandTracker();
     const [a] = tracker.update([detection('open', { cx: 0.7 })], 0, ASPECT);
     expect(a!.role).toBe('secondary');
-    const hands = tracker.update([detection('open', { cx: 0.7 }), detection('fist', { cx: 0.75, handedness: 'Left' })], 33, ASPECT);
+    const hands = tracker.update(
+      [detection('open', { cx: 0.7 }), detection('fist', { cx: 0.75, handedness: 'Left' })],
+      33,
+      ASPECT,
+    );
     expect(new Set(hands.map((h) => h.role))).toEqual(new Set(['primary', 'secondary']));
     expect(hands.find((h) => h.id === a!.id)!.role).toBe('secondary');
   });
